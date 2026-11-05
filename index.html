@@ -1,0 +1,2057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>ESP32-C3 Smart Pedometer</title>
+<style>
+:root{
+  --green:#00ff77;--blue:#3b82f6;--purple:#8b5cf6;
+  --yellow:#f59e0b;--red:#ef4444;--cyan:#06b6d4;
+  --bg:#080d16;--card:#0f1624;--card2:#141e30;
+  --border:#1a2540;--text:#e2e8f0;--muted:#4a5568;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;overflow-x:hidden}
+
+/* NAV */
+nav{position:sticky;top:0;z-index:100;background:#080d16ee;backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;gap:0}
+.nav-brand{font-weight:800;font-size:15px;color:var(--green);padding:16px 24px 16px 0;
+  border-right:1px solid var(--border);margin-right:8px;white-space:nowrap}
+.nav-tabs{display:flex;gap:2px;overflow-x:auto}
+.tab-btn{padding:16px 18px;background:none;border:none;color:var(--muted);
+  font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;
+  border-bottom:2px solid transparent;transition:.2s}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{color:var(--green);border-bottom-color:var(--green)}
+.tab-content{display:none}
+.tab-content.active{display:block}
+
+/* HERO */
+.hero{padding:70px 24px 50px;text-align:center;
+  background:radial-gradient(ellipse at 50% 0%,#00ff7710 0%,transparent 60%)}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;
+  background:#00ff7710;border:1px solid #00ff7730;color:var(--green);
+  border-radius:999px;padding:6px 18px;font-size:12px;font-weight:700;
+  letter-spacing:1px;margin-bottom:24px}
+.hero h1{font-size:clamp(2.2rem,6vw,4rem);font-weight:900;letter-spacing:-2px;
+  background:linear-gradient(135deg,#fff 40%,var(--green));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;margin-bottom:16px}
+.hero p{color:var(--muted);font-size:1.05rem;max-width:560px;margin:0 auto 32px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.chip{padding:5px 14px;border-radius:8px;font-size:12px;font-weight:700;
+  border:1px solid var(--border);background:var(--card2)}
+.chip.g{border-color:#00ff7740;color:var(--green);background:#00ff7708}
+.chip.b{border-color:#3b82f640;color:var(--blue);background:#3b82f608}
+.chip.p{border-color:#8b5cf640;color:var(--purple);background:#8b5cf608}
+.chip.y{border-color:#f59e0b40;color:var(--yellow);background:#f59e0b08}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+  gap:16px;max-width:900px;margin:40px auto 0;padding:0 24px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:16px;
+  padding:20px;text-align:center}
+.stat-num{font-size:2rem;font-weight:900;color:var(--green)}
+.stat-label{font-size:12px;color:var(--muted);margin-top:4px}
+
+/* SECTION */
+section{padding:60px 24px}
+.sec-inner{max-width:1100px;margin:0 auto}
+.sec-label{font-size:11px;font-weight:700;text-transform:uppercase;
+  letter-spacing:2px;color:var(--green);margin-bottom:8px}
+h2{font-size:1.9rem;font-weight:800;margin-bottom:8px}
+.sub{color:var(--muted);margin-bottom:36px;font-size:.95rem}
+section:nth-child(even){background:var(--card)}
+
+/* CIRCUIT DIAGRAM */
+#circuitWrap{position:relative;max-width:900px;margin:0 auto}
+#circuitSVG{width:100%;height:auto;display:block}
+.comp-info{background:var(--card2);border:1px solid var(--border);
+  border-radius:14px;padding:20px;margin-top:20px;min-height:80px;
+  transition:.3s;display:none}
+.comp-info.visible{display:block}
+.comp-info h3{margin-bottom:8px}
+.comp-info p{color:var(--muted);font-size:14px}
+.comp-pins{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.pin-tag{background:#00ff7712;border:1px solid #00ff7733;color:var(--green);
+  border-radius:6px;padding:3px 10px;font-family:monospace;font-size:12px;font-weight:700}
+
+/* SIMULATOR */
+.sim-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:1000px;margin:0 auto}
+@media(max-width:700px){.sim-grid{grid-template-columns:1fr}}
+.sim-panel{background:var(--card2);border:1px solid var(--border);border-radius:18px;padding:24px}
+.sim-panel h3{font-size:.95rem;font-weight:700;margin-bottom:16px;
+  display:flex;align-items:center;gap:8px}
+.oled-outer{background:#050505;border:3px solid #111;border-radius:10px;
+  padding:10px;box-shadow:inset 0 0 20px #000,0 0 30px #00ff7715;
+  display:inline-block;width:100%}
+#simOLED{display:block;width:100%;height:auto;image-rendering:pixelated}
+.sim-btn{width:100%;padding:12px;border-radius:10px;border:none;
+  font-size:14px;font-weight:700;cursor:pointer;transition:.15s;margin-bottom:10px}
+.sim-btn:active{transform:scale(.97)}
+.btn-walk{background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff}
+.btn-burst{background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff}
+.btn-reset{background:var(--card);border:1px solid var(--border);color:var(--muted)}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;
+  padding:12px 0;border-bottom:1px solid var(--border)}
+.toggle-row:last-child{border-bottom:none}
+.toggle-label{font-size:13px;font-weight:600}
+.toggle-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.toggle{position:relative;width:44px;height:24px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-track{position:absolute;inset:0;border-radius:12px;background:#1a2540;
+  transition:.2s;cursor:pointer}
+.toggle input:checked+.toggle-track{background:var(--green)}
+.toggle-dot{position:absolute;top:3px;left:3px;width:18px;height:18px;
+  border-radius:50%;background:#fff;transition:.2s;pointer-events:none}
+.toggle input:checked~.toggle-dot{transform:translateX(20px)}
+.led{width:14px;height:14px;border-radius:50%;background:#1a2540;
+  transition:.3s;flex-shrink:0}
+.led.on-green{background:#22c55e;box-shadow:0 0 10px #22c55e}
+.led.on-blue{background:#3b82f6;box-shadow:0 0 10px #3b82f6}
+.led.on-red{background:#ef4444;box-shadow:0 0 10px #ef4444}
+
+/* STATS ROW */
+.sim-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+.sim-stat{background:var(--card);border:1px solid var(--border);
+  border-radius:10px;padding:12px;text-align:center}
+.sim-stat-num{font-size:1.4rem;font-weight:800}
+.sim-stat-lbl{font-size:11px;color:var(--muted);margin-top:2px}
+
+/* PROGRESS BAR */
+.prog-wrap{margin:12px 0}
+.prog-track{background:#0a0f1a;border-radius:8px;height:10px;
+  overflow:hidden;border:1px solid var(--border)}
+.prog-fill{height:100%;border-radius:8px;background:linear-gradient(90deg,var(--green),#00ccff);
+  transition:width .3s;box-shadow:0 0 6px #00ff7766}
+.prog-labels{display:flex;justify-content:space-between;font-size:11px;
+  color:var(--muted);margin-top:4px}
+
+/* SERIAL MONITOR */
+.serial-box{background:#020608;border:1px solid var(--border);border-radius:12px;
+  padding:14px;height:220px;overflow-y:auto;font-family:'Courier New',monospace;font-size:12px}
+.serial-box p{line-height:1.7}
+.s-sys{color:#a78bfa}.s-step{color:#4ade80}.s-relay{color:#f59e0b}
+.s-gps{color:#60a5fa}.s-count{color:#f87171}.s-acc{color:#22d3ee}
+.serial-input-row{display:flex;gap:8px;margin-top:10px}
+.serial-input{flex:1;background:#020608;border:1px solid var(--border);
+  color:var(--text);border-radius:8px;padding:8px 12px;font-family:monospace;font-size:12px}
+.serial-send{padding:8px 16px;background:var(--card2);border:1px solid var(--border);
+  color:var(--muted);border-radius:8px;cursor:pointer;font-size:12px}
+
+/* WIRING TABLE */
+.wire-table-wrap{overflow-x:auto;border-radius:14px;border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;padding:12px 16px;color:var(--muted);font-size:11px;
+  text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border);
+  background:#040810}
+td{padding:12px 16px;border-bottom:1px solid var(--border)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#ffffff04}
+.pbadge{background:#00ff7714;color:var(--green);border:1px solid #00ff7733;
+  border-radius:6px;padding:2px 8px;font-family:monospace;font-size:12px;font-weight:700}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;
+  margin-right:6px;vertical-align:middle}
+
+/* FEATURE CARDS */
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.fcard{background:var(--card2);border:1px solid var(--border);border-radius:16px;
+  padding:22px;transition:.25s;cursor:default}
+.fcard:hover{border-color:#00ff7744;transform:translateY(-3px);
+  box-shadow:0 8px 30px #00ff7710}
+.fcard-icon{font-size:2rem;margin-bottom:12px}
+.fcard h3{font-size:1rem;font-weight:700;margin-bottom:8px}
+.fcard p{color:var(--muted);font-size:13px;line-height:1.6}
+
+/* MEMORY VIZ */
+.mem-anim{display:grid;grid-template-columns:1fr 1fr;gap:16px;
+  max-width:700px;margin:0 auto}
+.mem-block{background:var(--card2);border:2px solid var(--border);
+  border-radius:14px;padding:20px;text-align:center;position:relative;overflow:hidden}
+.mem-block::before{content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,transparent,#00ff7706);pointer-events:none}
+.mem-key{font-family:monospace;color:var(--green);font-size:1.1rem;
+  font-weight:800;margin-bottom:4px}
+.mem-val{font-size:2rem;font-weight:900;margin:8px 0;transition:.3s}
+.mem-type{font-size:11px;color:var(--muted)}
+.mem-pulse{animation:pulse .4s ease}
+@keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.15);color:var(--green)}100%{transform:scale(1)}}
+
+/* FLOW */
+.flow{max-width:680px;margin:0 auto}
+.flow-step{display:flex;gap:20px;align-items:flex-start}
+.flow-col{display:flex;flex-direction:column;align-items:center}
+.flow-dot{width:42px;height:42px;border-radius:50%;background:var(--card2);
+  border:2px solid var(--green);color:var(--green);font-weight:800;
+  display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
+.flow-line{width:2px;flex:1;min-height:28px;background:linear-gradient(var(--green),var(--border));margin:4px 0}
+.flow-body{padding-bottom:28px;flex:1}
+.flow-body h3{margin-bottom:4px}
+.flow-body p{color:var(--muted);font-size:13px}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:#1a2540;border-radius:3px}
+</style>
+</head>
+<body>
+
+<!-- ══ NAV ══ -->
+<nav>
+  <div class="nav-brand">🚶 SmartPedometer</div>
+  <div class="nav-tabs">
+    <button class="tab-btn active" onclick="showTab('overview',this)">Overview</button>
+    <button class="tab-btn" onclick="showTab('circuit',this)">Circuit</button>
+    <button class="tab-btn" onclick="showTab('simulator',this)">Simulator</button>
+    <button class="tab-btn" onclick="showTab('wiring',this)">Wiring</button>
+    <button class="tab-btn" onclick="showTab('memory',this)">Memory</button>
+    <button class="tab-btn" onclick="showTab('howworks',this)">How It Works</button>
+    <button class="tab-btn" onclick="showTab('gallery',this)">Gallery (14)</button>
+    <a href="game.html" class="tab-btn" style="text-decoration:none;color:#ffdd00;border:1px solid #ffdd0055;border-radius:6px;padding:6px 12px;margin:auto 4px;font-weight:700;">🎮 Play Game</a>
+    <a href="gallery.html" class="tab-btn" style="text-decoration:none;color:#00ff77;border:1px solid #00ff7744;border-radius:6px;padding:6px 12px;margin:auto 4px;font-weight:700;">📸 50 Figures</a>
+    <a href="presentation_kit/speech.html" class="tab-btn" style="text-decoration:none;color:#38bdf8;border:1px solid #38bdf844;border-radius:6px;padding:6px 12px;margin:auto 4px;font-weight:700;">🎤 Speech Kit</a>
+  </div>
+</nav>
+
+<!-- ══════════════ TAB: OVERVIEW ══════════════ -->
+<div class="tab-content active" id="tab-overview">
+  <div class="hero">
+    <div class="hero-badge">⚡ School Project · ESP32-C3</div>
+    <h1>Smart Pedometer<br/>&amp; TV Relay Controller</h1>
+    <p>Walk 20 seconds → earn 1 TV second. The chip remembers your steps forever.</p>
+    <div class="chips">
+      <span class="chip g">ESP32-C3</span>
+      <span class="chip b">NEO-6M GPS</span>
+      <span class="chip">ADXL345</span>
+      <span class="chip p">SSD1306 OLED</span>
+      <span class="chip y">5V Relay</span>
+      <span class="chip g">NVS Memory</span>
+    </div>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="stat-num">20s</div><div class="stat-label">Walk = 1 TV Second</div></div>
+    <div class="stat"><div class="stat-num">6</div><div class="stat-label">Hardware Pins Used</div></div>
+    <div class="stat"><div class="stat-num">∞</div><div class="stat-label">Step Memory (NVS)</div></div>
+    <div class="stat"><div class="stat-num">GPS</div><div class="stat-label">Location Validated</div></div>
+    <div class="stat"><div class="stat-num">128×32</div><div class="stat-label">OLED Resolution</div></div>
+  </div>
+
+  <section>
+    <div class="sec-inner">
+      <div class="sec-label">Features</div>
+      <h2>Everything It Does</h2>
+      <p class="sub">Click a card to learn more</p>
+      <div class="grid2">
+        <div class="fcard"><div class="fcard-icon">👟</div><h3>Real Walk Detection</h3><p>ADXL345 uses dynamic peak detection (delta &gt; 2.5 m/s²). Wrist shakes and tilts are rejected. Only genuine footfall impacts are registered.</p></div>
+        <div class="fcard"><div class="fcard-icon">⏱️</div><h3>20-Second Speed Limit</h3><p>Walk 20 continuous seconds to earn 1 TV second. The accumulator pauses when you stop and resumes from where it left off — no progress lost.</p></div>
+        <div class="fcard"><div class="fcard-icon">📺</div><h3>Relay TV Control</h3><p>5V relay physically cuts power to your TV when steps hit zero. Active-LOW on GPIO 2. Relay plug status detected via GPIO 6 sense line.</p></div>
+        <div class="fcard"><div class="fcard-icon">🛰️</div><h3>GPS Tracking</h3><p>NEO-6M GPS tracks real distance (m/km) and speed (km/h). Steps only count when GPS detects ≥ 0.5 km/h movement. Falls back indoors automatically.</p></div>
+        <div class="fcard"><div class="fcard-icon">💾</div><h3>Flash Memory</h3><p>Steps + walking progress saved to ESP32 NVS flash. Survives power cuts. On boot, the device shows "Steps saved: X" and restores your full progress.</p></div>
+        <div class="fcard"><div class="fcard-icon">🖥️</div><h3>Animated OLED</h3><p>Walking stickman with 4 animation frames. Motivational quotes. 20s progress bar. Alternates between step count and GPS distance every 3 seconds.</p></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ══════════════ TAB: GALLERY (14 IMAGES) ══════════════ -->
+<div class="tab-content" id="tab-gallery">
+  <section style="padding-top:40px">
+    <div class="sec-inner">
+      <div class="sec-label">Project Gallery</div>
+      <h2>Hardware &amp; System Photographs (14)</h2>
+      <p class="sub">Click any image to enlarge and inspect details</p>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;">
+        
+        <!-- Image 1 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/hardware_prototype_overview_1793602478676.jpg" alt="Complete Hardware Prototype" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '01. Complete Hardware Prototype', 'Full breadboard assembly of the ESP32-C3, ADXL345 accelerometer, SSD1306 OLED, 5V relay module, and NEO-6M GPS receiver.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--green);font-weight:700">01 · OVERVIEW</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Complete Hardware Prototype</h4>
+            <p style="font-size:12px;color:var(--muted)">Breadboard prototype with all modules interconnected via color-coded jumper wires.</p>
+          </div>
+        </div>
+
+        <!-- Image 2 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/adxl345_step_detection_walking_1793602474657.jpg" alt="Walking & Step Detection" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '02. Walking & Step Detection Test', 'Outdoor physical test of the ADXL345 dynamic impact sensor measuring footsteps while rejecting false shakes.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--green);font-weight:700">02 · STEP DETECTION</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Walking &amp; Step Detection Test</h4>
+            <p style="font-size:12px;color:var(--muted)">ADXL345 dynamic low-pass delta filter capturing real footfall impact pulses.</p>
+          </div>
+        </div>
+
+        <!-- Image 3 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/neo6m_gps_outdoor_tracking_1793602481978.jpg" alt="GPS Outdoor Tracking" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '03. GPS Outdoor Tracking & Distance', 'Outdoor field testing of the NEO-6M GPS receiver tracking distance (0.85 km) and speed (4.2 km/h).')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--blue);font-weight:700">03 · GPS TRACKING</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">GPS Outdoor Distance Tracking</h4>
+            <p style="font-size:12px;color:var(--muted)">Satellite coordinates stream over UART1 to validate movement and prevent indoor cheating.</p>
+          </div>
+        </div>
+
+        <!-- Image 4 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/oled_display_macro_1793602478614.jpg" alt="OLED Display Macro" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '04. OLED Display & 20s Progress Bar', 'Miniature 0.91-inch OLED showing the 4-frame stickman animation, motivational quotes, and the 20-second progress bar.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--purple);font-weight:700">04 · OLED DISPLAY</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">OLED &amp; 20s Progress Bar</h4>
+            <p style="font-size:12px;color:var(--muted)">128x32 display with walking stickman, speech text, step numbers, and accumulator bar.</p>
+          </div>
+        </div>
+
+        <!-- Image 5 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/relay_tv_power_control_png_1793602484986.jpg" alt="Relay TV Power Control" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '05. Relay TV Power Control (Active-LOW)', '5V relay switching television power. GPIO 2 LOW turns the TV on while countdown decrements steps.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--yellow);font-weight:700">05 · RELAY CONTROL</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Relay TV Power Control</h4>
+            <p style="font-size:12px;color:var(--muted)">5V relay module with IN1 LED indicator controlling appliance power based on steps.</p>
+          </div>
+        </div>
+
+        <!-- Image 6 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/science_fair_pedometer_booth_1793602519436.jpg" alt="Science Fair Booth" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '06. School Science Fair Exhibition Booth', 'Science competition presentation booth featuring the trifold poster board, breadboard prototype, and laptop simulator.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--green);font-weight:700">06 · EXHIBITION</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Science Fair Exhibition Booth</h4>
+            <p style="font-size:12px;color:var(--muted)">Project display poster, prototype table, and open laptop showing real-time telemetry.</p>
+          </div>
+        </div>
+
+        <!-- Image 7 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/esp32_c3_pin_wiring_macro_1793602843143.jpg" alt="ESP32-C3 Macro Wiring" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '07. ESP32-C3 Board & Pin Wiring Macro', 'High-detail macro photo of the ESP32-C3 dev board, status LEDs, USB-C interface, and DuPont jumper wires.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--blue);font-weight:700">07 · CONTROLLER</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">ESP32-C3 Board &amp; Wiring Macro</h4>
+            <p style="font-size:12px;color:var(--muted)">RISC-V 32-bit core running at 160MHz routing I2C, UART1, and GPIO signals.</p>
+          </div>
+        </div>
+
+        <!-- Image 8 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/wearable_pedometer_wristband_prototype_1793602840123.jpg" alt="Wearable Watch Concept" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '08. 3D-Printed Wearable Watch Enclosure', 'Commercial product design prototype showing the circuit miniaturized into a 3D-printed sports fitness watch.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--cyan);font-weight:700">08 · DESIGN CONCEPT</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">3D-Printed Wearable Watch</h4>
+            <p style="font-size:12px;color:var(--muted)">Custom enclosure packaging the OLED, battery, and sensors into a wearable wristband.</p>
+          </div>
+        </div>
+
+        <!-- Image 9 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/adxl345_sensor_calibration_multimeter_testing_1793602840082.jpg" alt="Sensor Calibration" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '09. ADXL345 Calibration & Multimeter Testing', 'Electronics bench measurement showing digital multimeter probes testing 3.3V and I2C SDA/SCL lines.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--yellow);font-weight:700">09 · TESTING</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">ADXL345 Calibration Testing</h4>
+            <p style="font-size:12px;color:var(--muted)">Voltage verification and oscilloscope tracing of I2C bus communications at 100 kHz.</p>
+          </div>
+        </div>
+
+        <!-- Image 10 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/neo6m_gps_antenna_macro_1793602846170.jpg" alt="GPS Antenna Macro" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '10. NEO-6M GPS Ceramic Antenna Macro', 'Close-up of the square ceramic patch antenna, U-blox receiver IC, backup battery, and active PPS LED.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--cyan);font-weight:700">10 · ANTENNA</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">NEO-6M GPS Antenna Macro</h4>
+            <p style="font-size:12px;color:var(--muted)">Ceramic receiver patch capturing satellite constellations with 1-pulse-per-second lock.</p>
+          </div>
+        </div>
+
+        <!-- Image 11 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/tv_power_cut_off_event_1793602878212.jpg" alt="TV Power Cut Event" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '11. TV Power Cut Event (Zero Steps Trigger)', 'The exact moment steps reach zero: relay de-energizes, OLED prompts Walk 2 get steps!, and the TV cuts off.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--red);font-weight:700">11 · CUT-OFF EVENT</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">TV Power Cut-Off Event</h4>
+            <p style="font-size:12px;color:var(--muted)">When step count reaches 0, the relay immediately opens and cuts TV power.</p>
+          </div>
+        </div>
+
+        <!-- Image 12 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/esp32_nvs_persistence_powerup_1793602889237.jpg" alt="NVS Memory Persistence" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '12. NVS Flash Memory Retention on Boot', 'Plugging in USB-C power demonstrates step restoration from flash memory without losing progress.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--green);font-weight:700">12 · MEMORY</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">NVS Flash Memory Retention</h4>
+            <p style="font-size:12px;color:var(--muted)">Survives reboots and power cuts by writing steps to ESP32 non-volatile storage.</p>
+          </div>
+        </div>
+
+        <!-- Image 13 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/student_breadboard_assembly_1793602893427.jpg" alt="Student Assembly" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '13. Student Breadboard Circuit Assembly', 'Hands-on construction showing wiring tweezers, wire strippers, printed pin table, and breadboard placement.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--yellow);font-weight:700">13 · STEM WORKSHOP</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Student Breadboard Assembly</h4>
+            <p style="font-size:12px;color:var(--muted)">Precision breadboard wiring using DuPont jumpers, tweezers, and circuit diagrams.</p>
+          </div>
+        </div>
+
+        <!-- Image 14 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/smart_pedometer_prototype_1793531618535.jpg" alt="Maker Prototype" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '14. Maker Workbench Prototype', 'The original working breadboard prototype operating on a wooden workshop desk with display luminescence.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--purple);font-weight:700">14 · FIRST BUILD</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Maker Workbench Prototype</h4>
+            <p style="font-size:12px;color:var(--muted)">Initial working prototype demonstrating circuit connectivity and LED luminescence.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- IMAGE LIGHTBOX MODAL -->
+<div id="imgModal" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:24px" onclick="closeModal()">
+  <div style="max-width:850px;width:100%;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;position:relative" onclick="event.stopPropagation()">
+    <button onclick="closeModal()" style="position:absolute;top:16px;right:16px;background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer;line-height:1">&times;</button>
+    <img id="modalImg" src="" alt="" style="width:100%;max-height:550px;object-fit:contain;border-radius:10px;background:#000;margin-bottom:14px"/>
+    <h3 id="modalTitle" style="font-size:1.1rem;margin-bottom:6px"></h3>
+    <p id="modalDesc" style="color:var(--muted);font-size:13px"></p>
+  </div>
+</div>
+
+<script>
+function openModal(src, title, desc){
+  document.getElementById('modalImg').src = src;
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalDesc').textContent = desc;
+  document.getElementById('imgModal').style.display = 'flex';
+}
+function closeModal(){
+  document.getElementById('imgModal').style.display = 'none';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+</script>
+
+<!-- ══════════════ TAB: CIRCUIT ══════════════ -->
+<div class="tab-content" id="tab-circuit">
+  <section style="padding-top:40px">
+    <div class="sec-inner">
+      <div class="sec-label">Interactive Circuit</div>
+      <h2>Click Any Component</h2>
+      <p class="sub">Click a component on the diagram to see its connections and details</p>
+
+      <div id="circuitWrap">
+        <svg id="circuitSVG" viewBox="0 0 900 520" xmlns="http://www.w3.org/2000/svg"
+          style="border-radius:16px;border:1px solid #1a2540;background:#060c18;cursor:pointer">
+
+          <!-- Breadboard base -->
+          <rect x="20" y="20" width="860" height="480" rx="12" fill="#0a1020" stroke="#1a2540" stroke-width="1.5"/>
+
+          <!-- Breadboard grid dots -->
+          <g opacity="0.15" fill="#4a6080">
+            <script>/* dots rendered by JS */</script>
+          </g>
+
+          <!-- ── WIRES ── drawn first so components sit on top -->
+          <!-- Power rails: red -->
+          <line id="w-vcc-adxl"  x1="220" y1="110" x2="310" y2="110" stroke="#ef4444" stroke-width="2.5" stroke-dasharray="4 2" opacity="0.7"/>
+          <line id="w-vcc-oled"  x1="220" y1="110" x2="120" y2="200" stroke="#ef4444" stroke-width="2.5" stroke-dasharray="4 2" opacity="0.7"/>
+          <line id="w-vcc-relay" x1="580" y1="110" x2="680" y2="200" stroke="#ef4444" stroke-width="2.5" stroke-dasharray="4 2" opacity="0.7"/>
+          <line id="w-vcc-gps"   x1="580" y1="110" x2="720" y2="380" stroke="#ef4444" stroke-width="2.5" stroke-dasharray="4 2" opacity="0.7"/>
+          <!-- GND rails: dark -->
+          <line id="w-gnd-all"   x1="400" y1="440" x2="400" y2="480" stroke="#374151" stroke-width="3" opacity="0.8"/>
+          <!-- I2C: blue -->
+          <line id="w-sda-adxl"  x1="310" y1="130" x2="360" y2="240" stroke="#3b82f6" stroke-width="2.5" opacity="0.85"/>
+          <line id="w-sda-oled"  x1="120" y1="220" x2="360" y2="240" stroke="#3b82f6" stroke-width="2.5" opacity="0.85"/>
+          <line id="w-scl-adxl"  x1="310" y1="150" x2="380" y2="270" stroke="#60a5fa" stroke-width="2.5" opacity="0.85"/>
+          <line id="w-scl-oled"  x1="120" y1="240" x2="380" y2="270" stroke="#60a5fa" stroke-width="2.5" opacity="0.85"/>
+          <!-- Relay control: yellow -->
+          <line id="w-relay-in1" x1="580" y1="280" x2="680" y2="260" stroke="#f59e0b" stroke-width="2.5" opacity="0.85"/>
+          <!-- Relay sense: green -->
+          <line id="w-relay-sense" x1="580" y1="300" x2="680" y2="340" stroke="#22c55e" stroke-width="2.5" opacity="0.85"/>
+          <!-- GPS UART: white/cyan -->
+          <line id="w-gps-rx"   x1="560" y1="310" x2="720" y2="400" stroke="#e2e8f0" stroke-width="2.5" opacity="0.85"/>
+          <line id="w-gps-tx"   x1="560" y1="330" x2="720" y2="420" stroke="#06b6d4" stroke-width="2.5" opacity="0.85"/>
+
+          <!-- ── ESP32-C3 ── center -->
+          <g id="comp-esp32" class="comp" onclick="selectComp('esp32')" style="cursor:pointer">
+            <rect x="360" y="220" width="200" height="180" rx="10"
+              fill="#0d1f3a" stroke="#3b82f6" stroke-width="2"/>
+            <rect x="370" y="230" width="180" height="160" rx="6" fill="#0a1628"/>
+            <!-- chip body -->
+            <rect x="400" y="260" width="120" height="80" rx="4" fill="#1a2f4a" stroke="#3b82f680" stroke-width="1"/>
+            <text x="460" y="295" text-anchor="middle" fill="#60a5fa" font-size="11" font-weight="700">ESP32-C3</text>
+            <text x="460" y="310" text-anchor="middle" fill="#3b82f6" font-size="8">RISC-V · WiFi · BT</text>
+            <!-- USB-C port -->
+            <rect x="445" y="380" width="30" height="12" rx="4" fill="#1a2540" stroke="#4a5568" stroke-width="1"/>
+            <text x="460" y="389" text-anchor="middle" fill="#4a5568" font-size="7">USB-C</text>
+            <!-- Pin labels -->
+            <text x="372" y="248" fill="#00ff7788" font-size="7" font-family="monospace">GPIO0</text>
+            <text x="372" y="260" fill="#00ff7788" font-size="7" font-family="monospace">GPIO1</text>
+            <text x="372" y="272" fill="#f59e0b88" font-size="7" font-family="monospace">GPIO2</text>
+            <text x="372" y="284" fill="#22c55e88" font-size="7" font-family="monospace">GPIO6</text>
+            <text x="372" y="296" fill="#3b82f688" font-size="7" font-family="monospace">GPIO4</text>
+            <text x="372" y="308" fill="#60a5fa88" font-size="7" font-family="monospace">GPIO5</text>
+            <text x="460" y="420" text-anchor="middle" fill="#3b82f6" font-size="10" font-weight="700">MICROCONTROLLER</text>
+            <!-- LED power indicator -->
+            <circle cx="530" cy="240" r="4" fill="#22c55e" opacity="0.9">
+              <animate attributeName="opacity" values="0.9;0.3;0.9" dur="1.5s" repeatCount="indefinite"/>
+            </circle>
+          </g>
+
+          <!-- ── ADXL345 ── left -->
+          <g id="comp-adxl" class="comp" onclick="selectComp('adxl')" style="cursor:pointer">
+            <rect x="250" y="80" width="110" height="90" rx="8"
+              fill="#0a1f0a" stroke="#22c55e" stroke-width="2"/>
+            <rect x="258" y="88" width="94" height="74" rx="4" fill="#071407"/>
+            <text x="305" y="115" text-anchor="middle" fill="#22c55e" font-size="10" font-weight="700">ADXL345</text>
+            <text x="305" y="128" text-anchor="middle" fill="#22c55e88" font-size="8">Accelerometer</text>
+            <text x="305" y="142" text-anchor="middle" fill="#4a5568" font-size="7">I2C 0x53</text>
+            <!-- Chip -->
+            <rect x="280" y="148" width="50" height="16" rx="2" fill="#0d2010" stroke="#22c55e40" stroke-width="1"/>
+            <text x="282" y="159" text-anchor="start" fill="#22c55e60" font-size="6" font-family="monospace">ADXL345BCCZ</text>
+          </g>
+
+          <!-- ── OLED ── top-left -->
+          <g id="comp-oled" class="comp" onclick="selectComp('oled')" style="cursor:pointer">
+            <rect x="50" y="170" width="130" height="90" rx="8"
+              fill="#050f1a" stroke="#8b5cf6" stroke-width="2"/>
+            <rect x="58" y="178" width="114" height="74" rx="4" fill="#020810"/>
+            <!-- OLED screen area -->
+            <rect x="64" y="184" width="102" height="48" rx="3" fill="#000" stroke="#00ff7730" stroke-width="1"/>
+            <text x="115" y="205" text-anchor="middle" fill="#00ff77" font-size="8" font-family="monospace">🚶 42s</text>
+            <text x="115" y="218" text-anchor="middle" fill="#00ff7780" font-size="6" font-family="monospace">Walk On!</text>
+            <!-- Pixel bar -->
+            <rect x="66" y="227" width="60" height="2" fill="#00ff77" rx="1"/>
+            <text x="115" y="248" text-anchor="middle" fill="#8b5cf6" font-size="9" font-weight="700">SSD1306</text>
+            <text x="115" y="258" text-anchor="middle" fill="#4a5568" font-size="7">128×32 I2C</text>
+          </g>
+
+          <!-- ── RELAY ── right -->
+          <g id="comp-relay" class="comp" onclick="selectComp('relay')" style="cursor:pointer">
+            <rect x="650" y="170" width="130" height="140" rx="8"
+              fill="#1a1000" stroke="#f59e0b" stroke-width="2"/>
+            <rect x="658" y="178" width="114" height="124" rx="4" fill="#0f0900"/>
+            <!-- Relay coil -->
+            <rect x="668" y="185" width="60" height="55" rx="4" fill="#1a1200" stroke="#f59e0b40" stroke-width="1"/>
+            <text x="698" y="210" text-anchor="middle" fill="#f59e0b" font-size="9" font-weight="700">RELAY</text>
+            <text x="698" y="222" text-anchor="middle" fill="#f59e0b80" font-size="7">5V Coil</text>
+            <!-- LED indicator -->
+            <circle id="relayLedSVG" cx="748" cy="200" r="7" fill="#1a1200" stroke="#ef444480" stroke-width="1.5"/>
+            <text x="748" y="203.5" text-anchor="middle" fill="#ef4444" font-size="6" font-weight="700">IN1</text>
+            <!-- Contacts -->
+            <rect x="668" y="250" width="94" height="32" rx="3" fill="#0d0d0d" stroke="#37415180" stroke-width="1"/>
+            <text x="715" y="263" text-anchor="middle" fill="#6b7280" font-size="7">NO  COM  NC</text>
+            <text x="715" y="275" text-anchor="middle" fill="#4a5568" font-size="6">Active-LOW GPIO2</text>
+            <text x="715" y="305" text-anchor="middle" fill="#f59e0b" font-size="9" font-weight="700">5V RELAY</text>
+          </g>
+
+          <!-- ── GPS ── bottom-right -->
+          <g id="comp-gps" class="comp" onclick="selectComp('gps')" style="cursor:pointer">
+            <rect x="680" y="360" width="160" height="110" rx="8"
+              fill="#00001a" stroke="#06b6d4" stroke-width="2"/>
+            <rect x="688" y="368" width="144" height="94" rx="4" fill="#000010"/>
+            <!-- GPS antenna patch -->
+            <rect x="720" y="374" width="60" height="40" rx="3" fill="#0a0a20" stroke="#06b6d420" stroke-width="1"/>
+            <text x="750" y="390" text-anchor="middle" fill="#06b6d4" font-size="8" font-weight="700">GPS</text>
+            <text x="750" y="402" text-anchor="middle" fill="#06b6d480" font-size="6">Antenna</text>
+            <text x="760" y="430" text-anchor="middle" fill="#06b6d4" font-size="9" font-weight="700">NEO-6M GPS</text>
+            <text x="760" y="442" text-anchor="middle" fill="#4a5568" font-size="7">UART1 · 9600 baud</text>
+            <!-- Satellite icon -->
+            <text x="700" y="398" fill="#06b6d480" font-size="14">🛰</text>
+          </g>
+
+          <!-- ── GND rail ── -->
+          <rect x="30" y="470" width="840" height="20" rx="4" fill="#0d1320" stroke="#1a2540" stroke-width="1"/>
+          <text x="50" y="484" fill="#374151" font-size="9" font-weight="700" font-family="monospace">GND ─────────────────────────────────────────────────────────────────────────────</text>
+          <rect x="30" y="50" width="840" height="18" rx="4" fill="#1a0a0a" stroke="#2d1515" stroke-width="1"/>
+          <text x="50" y="62" fill="#7f1d1d" font-size="9" font-weight="700" font-family="monospace">3.3V / 5V ─────────────────────────────────────────────────────────────────────</text>
+
+          <!-- Labels -->
+          <text x="460" y="505" text-anchor="middle" fill="#1a2540" font-size="10" font-family="monospace">ESP32-C3 Smart Pedometer · Breadboard Prototype</text>
+        </svg>
+      </div>
+
+      <!-- Component info panel -->
+      <div class="comp-info" id="compInfo">
+        <h3 id="compTitle">—</h3>
+        <p id="compDesc">—</p>
+        <div class="comp-pins" id="compPins"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ══════════════ TAB: GALLERY (14 IMAGES) ══════════════ -->
+<div class="tab-content" id="tab-gallery">
+  <section style="padding-top:40px">
+    <div class="sec-inner">
+      <div class="sec-label">Project Gallery</div>
+      <h2>Hardware &amp; System Photographs (14)</h2>
+      <p class="sub">Click any image to enlarge and inspect details</p>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;">
+        
+        <!-- Image 1 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/hardware_prototype_overview_1793602478676.jpg" alt="Complete Hardware Prototype" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '01. Complete Hardware Prototype', 'Full breadboard assembly of the ESP32-C3, ADXL345 accelerometer, SSD1306 OLED, 5V relay module, and NEO-6M GPS receiver.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--green);font-weight:700">01 · OVERVIEW</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Complete Hardware Prototype</h4>
+            <p style="font-size:12px;color:var(--muted)">Breadboard prototype with all modules interconnected via color-coded jumper wires.</p>
+          </div>
+        </div>
+
+        <!-- Image 2 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/adxl345_step_detection_walking_1793602474657.jpg" alt="Walking & Step Detection" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '02. Walking & Step Detection Test', 'Outdoor physical test of the ADXL345 dynamic impact sensor measuring footsteps while rejecting false shakes.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--green);font-weight:700">02 · STEP DETECTION</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Walking &amp; Step Detection Test</h4>
+            <p style="font-size:12px;color:var(--muted)">ADXL345 dynamic low-pass delta filter capturing real footfall impact pulses.</p>
+          </div>
+        </div>
+
+        <!-- Image 3 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/neo6m_gps_outdoor_tracking_1793602481978.jpg" alt="GPS Outdoor Tracking" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '03. GPS Outdoor Tracking & Distance', 'Outdoor field testing of the NEO-6M GPS receiver tracking distance (0.85 km) and speed (4.2 km/h).')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--blue);font-weight:700">03 · GPS TRACKING</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">GPS Outdoor Distance Tracking</h4>
+            <p style="font-size:12px;color:var(--muted)">Satellite coordinates stream over UART1 to validate movement and prevent indoor cheating.</p>
+          </div>
+        </div>
+
+        <!-- Image 4 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/oled_display_macro_1793602478614.jpg" alt="OLED Display Macro" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '04. OLED Display & 20s Progress Bar', 'Miniature 0.91-inch OLED showing the 4-frame stickman animation, motivational quotes, and the 20-second progress bar.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--purple);font-weight:700">04 · OLED DISPLAY</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">OLED &amp; 20s Progress Bar</h4>
+            <p style="font-size:12px;color:var(--muted)">128x32 display with walking stickman, speech text, step numbers, and accumulator bar.</p>
+          </div>
+        </div>
+
+        <!-- Image 5 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/relay_tv_power_control_png_1793602484986.jpg" alt="Relay TV Power Control" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '05. Relay TV Power Control (Active-LOW)', '5V relay switching television power. GPIO 2 LOW turns the TV on while countdown decrements steps.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--yellow);font-weight:700">05 · RELAY CONTROL</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Relay TV Power Control</h4>
+            <p style="font-size:12px;color:var(--muted)">5V relay module with IN1 LED indicator controlling appliance power based on steps.</p>
+          </div>
+        </div>
+
+        <!-- Image 6 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/science_fair_pedometer_booth_1793602519436.jpg" alt="Science Fair Booth" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '06. School Science Fair Exhibition Booth', 'Science competition presentation booth featuring the trifold poster board, breadboard prototype, and laptop simulator.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--green);font-weight:700">06 · EXHIBITION</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Science Fair Exhibition Booth</h4>
+            <p style="font-size:12px;color:var(--muted)">Project display poster, prototype table, and open laptop showing real-time telemetry.</p>
+          </div>
+        </div>
+
+        <!-- Image 7 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/esp32_c3_pin_wiring_macro_1793602843143.jpg" alt="ESP32-C3 Macro Wiring" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '07. ESP32-C3 Board & Pin Wiring Macro', 'High-detail macro photo of the ESP32-C3 dev board, status LEDs, USB-C interface, and DuPont jumper wires.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--blue);font-weight:700">07 · CONTROLLER</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">ESP32-C3 Board &amp; Wiring Macro</h4>
+            <p style="font-size:12px;color:var(--muted)">RISC-V 32-bit core running at 160MHz routing I2C, UART1, and GPIO signals.</p>
+          </div>
+        </div>
+
+        <!-- Image 8 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/wearable_pedometer_wristband_prototype_1793602840123.jpg" alt="Wearable Watch Concept" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '08. 3D-Printed Wearable Watch Enclosure', 'Commercial product design prototype showing the circuit miniaturized into a 3D-printed sports fitness watch.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--cyan);font-weight:700">08 · DESIGN CONCEPT</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">3D-Printed Wearable Watch</h4>
+            <p style="font-size:12px;color:var(--muted)">Custom enclosure packaging the OLED, battery, and sensors into a wearable wristband.</p>
+          </div>
+        </div>
+
+        <!-- Image 9 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/adxl345_sensor_calibration_multimeter_testing_1793602840082.jpg" alt="Sensor Calibration" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '09. ADXL345 Calibration & Multimeter Testing', 'Electronics bench measurement showing digital multimeter probes testing 3.3V and I2C SDA/SCL lines.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--yellow);font-weight:700">09 · TESTING</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">ADXL345 Calibration Testing</h4>
+            <p style="font-size:12px;color:var(--muted)">Voltage verification and oscilloscope tracing of I2C bus communications at 100 kHz.</p>
+          </div>
+        </div>
+
+        <!-- Image 10 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/neo6m_gps_antenna_macro_1793602846170.jpg" alt="GPS Antenna Macro" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '10. NEO-6M GPS Ceramic Antenna Macro', 'Close-up of the square ceramic patch antenna, U-blox receiver IC, backup battery, and active PPS LED.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--cyan);font-weight:700">10 · ANTENNA</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">NEO-6M GPS Antenna Macro</h4>
+            <p style="font-size:12px;color:var(--muted)">Ceramic receiver patch capturing satellite constellations with 1-pulse-per-second lock.</p>
+          </div>
+        </div>
+
+        <!-- Image 11 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/tv_power_cut_off_event_1793602878212.jpg" alt="TV Power Cut Event" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '11. TV Power Cut Event (Zero Steps Trigger)', 'The exact moment steps reach zero: relay de-energizes, OLED prompts Walk 2 get steps!, and the TV cuts off.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--red);font-weight:700">11 · CUT-OFF EVENT</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">TV Power Cut-Off Event</h4>
+            <p style="font-size:12px;color:var(--muted)">When step count reaches 0, the relay immediately opens and cuts TV power.</p>
+          </div>
+        </div>
+
+        <!-- Image 12 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/esp32_nvs_persistence_powerup_1793602889237.jpg" alt="NVS Memory Persistence" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '12. NVS Flash Memory Retention on Boot', 'Plugging in USB-C power demonstrates step restoration from flash memory without losing progress.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--green);font-weight:700">12 · MEMORY</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">NVS Flash Memory Retention</h4>
+            <p style="font-size:12px;color:var(--muted)">Survives reboots and power cuts by writing steps to ESP32 non-volatile storage.</p>
+          </div>
+        </div>
+
+        <!-- Image 13 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/student_breadboard_assembly_1793602893427.jpg" alt="Student Assembly" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '13. Student Breadboard Circuit Assembly', 'Hands-on construction showing wiring tweezers, wire strippers, printed pin table, and breadboard placement.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--yellow);font-weight:700">13 · STEM WORKSHOP</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Student Breadboard Assembly</h4>
+            <p style="font-size:12px;color:var(--muted)">Precision breadboard wiring using DuPont jumpers, tweezers, and circuit diagrams.</p>
+          </div>
+        </div>
+
+        <!-- Image 14 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/smart_pedometer_prototype_1793531618535.jpg" alt="Maker Prototype" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '14. Maker Workbench Prototype', 'The original working breadboard prototype operating on a wooden workshop desk with display luminescence.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--purple);font-weight:700">14 · FIRST BUILD</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Maker Workbench Prototype</h4>
+            <p style="font-size:12px;color:var(--muted)">Initial working prototype demonstrating circuit connectivity and LED luminescence.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- IMAGE LIGHTBOX MODAL -->
+<div id="imgModal" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:24px" onclick="closeModal()">
+  <div style="max-width:850px;width:100%;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;position:relative" onclick="event.stopPropagation()">
+    <button onclick="closeModal()" style="position:absolute;top:16px;right:16px;background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer;line-height:1">&times;</button>
+    <img id="modalImg" src="" alt="" style="width:100%;max-height:550px;object-fit:contain;border-radius:10px;background:#000;margin-bottom:14px"/>
+    <h3 id="modalTitle" style="font-size:1.1rem;margin-bottom:6px"></h3>
+    <p id="modalDesc" style="color:var(--muted);font-size:13px"></p>
+  </div>
+</div>
+
+<script>
+function openModal(src, title, desc){
+  document.getElementById('modalImg').src = src;
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalDesc').textContent = desc;
+  document.getElementById('imgModal').style.display = 'flex';
+}
+function closeModal(){
+  document.getElementById('imgModal').style.display = 'none';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+</script>
+
+<!-- ══════════════ TAB: SIMULATOR ══════════════ -->
+<div class="tab-content" id="tab-simulator">
+  <section style="padding-top:40px">
+    <div class="sec-inner">
+      <div class="sec-label">Live Simulator</div>
+      <h2>Device Simulator</h2>
+      <p class="sub">Interact with the pedometer exactly as the real hardware behaves</p>
+
+      <div class="sim-grid">
+        <!-- LEFT: OLED + Stats -->
+        <div>
+          <div class="sim-panel">
+            <h3>🖥️ 0.91″ SSD1306 OLED Display</h3>
+            <div class="oled-outer">
+              <canvas id="simOLED" width="128" height="32" style="width:100%;height:auto"></canvas>
+            </div>
+            <div class="prog-wrap" style="margin-top:14px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <span style="font-size:12px;font-weight:600;color:var(--muted)">20s Walking Accumulator</span>
+                <span id="accLabel" style="font-size:12px;font-family:monospace;color:var(--green)">0s / 20s</span>
+              </div>
+              <div class="prog-track"><div class="prog-fill" id="accBar" style="width:0%"></div></div>
+              <div class="prog-labels"><span>0s</span><span>10s</span><span>20s → +1 Step</span></div>
+            </div>
+            <div class="sim-stats">
+              <div class="sim-stat">
+                <div class="sim-stat-num" id="sSteps" style="color:var(--green)">0</div>
+                <div class="sim-stat-lbl">TV Steps</div>
+              </div>
+              <div class="sim-stat">
+                <div class="sim-stat-num" id="sDist" style="color:var(--blue)">0m</div>
+                <div class="sim-stat-lbl">GPS Distance</div>
+              </div>
+              <div class="sim-stat">
+                <div class="sim-stat-num" id="sSpeed" style="color:var(--yellow)">0.0</div>
+                <div class="sim-stat-lbl">km/h</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Serial Monitor -->
+          <div class="sim-panel" style="margin-top:16px">
+            <h3>📟 Serial Monitor <span style="color:var(--muted);font-weight:400;font-size:11px">115200 baud</span>
+              <button onclick="clearSerial()" style="margin-left:auto;background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px">Clear</button>
+            </h3>
+            <div class="serial-box" id="serialBox"></div>
+          </div>
+        </div>
+
+        <!-- RIGHT: Controls -->
+        <div>
+          <!-- Walking Controls -->
+          <div class="sim-panel" style="margin-bottom:16px">
+            <h3>👟 ADXL345 — Step Input</h3>
+            <button class="sim-btn btn-walk" id="btnWalk" onclick="startWalk()">🚶 Hold to Walk</button>
+            <button class="sim-btn btn-burst" onclick="burst10()">🏃 Burst Walk (+10 seconds)</button>
+            <button class="sim-btn btn-reset" onclick="resetDevice()">⟳ Hardware RESET (keeps memory)</button>
+
+            <div style="margin-top:8px;background:var(--card);border-radius:8px;padding:12px">
+              <div style="font-size:12px;color:var(--muted);margin-bottom:6px">GPS Speed (km/h)</div>
+              <input type="range" id="gpsSpeed" min="0" max="8" step="0.1" value="0"
+                style="width:100%;accent-color:var(--cyan)" oninput="updateGPSSpeed(this.value)"/>
+              <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted)">
+                <span>0 km/h</span><span id="gpsSpeedVal" style="color:var(--cyan)">0.0 km/h</span><span>8 km/h</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Hardware Controls -->
+          <div class="sim-panel">
+            <h3>⚙️ Hardware Pins</h3>
+
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">🔌 GPIO 6 — Relay Sense</div>
+                <div class="toggle-sub">LOW = Relay connected · Countdown runs</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px">
+                <div class="led" id="senseLED"></div>
+                <label class="toggle">
+                  <input type="checkbox" id="relaySense" onchange="toggleRelay(this.checked)"/>
+                  <div class="toggle-track"></div>
+                  <div class="toggle-dot"></div>
+                </label>
+              </div>
+            </div>
+
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">🛰️ GPS Fix</div>
+                <div class="toggle-sub">Simulates satellite lock (NEO-6M)</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px">
+                <div class="led" id="gpsLED"></div>
+                <label class="toggle">
+                  <input type="checkbox" id="gpsFix" onchange="toggleGPS(this.checked)"/>
+                  <div class="toggle-track"></div>
+                  <div class="toggle-dot"></div>
+                </label>
+              </div>
+            </div>
+
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">📺 GPIO 2 — Relay Output</div>
+                <div class="toggle-sub">Active-LOW · LOW = TV powered</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px">
+                <div class="led" id="relayLED"></div>
+                <span id="relayState" style="font-size:12px;font-family:monospace;color:var(--muted)">HIGH</span>
+              </div>
+            </div>
+
+            <!-- GPS distance display -->
+            <div style="margin-top:16px;background:var(--card);border-radius:10px;padding:14px">
+              <div style="font-size:12px;font-weight:700;margin-bottom:8px;color:var(--cyan)">🛰️ GPS Data</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
+                <div><span style="color:var(--muted)">Distance:</span> <span id="gpsDistLbl" style="color:var(--cyan)">0m</span></div>
+                <div><span style="color:var(--muted)">Speed:</span> <span id="gpsSpeedLbl" style="color:var(--cyan)">0.0 km/h</span></div>
+                <div><span style="color:var(--muted)">Fix:</span> <span id="gpsFixLbl" style="color:var(--red)">NO FIX</span></div>
+                <div><span style="color:var(--muted)">Sats:</span> <span id="gpsSats" style="color:var(--cyan)">0</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ══════════════ TAB: GALLERY (14 IMAGES) ══════════════ -->
+<div class="tab-content" id="tab-gallery">
+  <section style="padding-top:40px">
+    <div class="sec-inner">
+      <div class="sec-label">Project Gallery</div>
+      <h2>Hardware &amp; System Photographs (14)</h2>
+      <p class="sub">Click any image to enlarge and inspect details</p>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;">
+        
+        <!-- Image 1 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/hardware_prototype_overview_1793602478676.jpg" alt="Complete Hardware Prototype" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '01. Complete Hardware Prototype', 'Full breadboard assembly of the ESP32-C3, ADXL345 accelerometer, SSD1306 OLED, 5V relay module, and NEO-6M GPS receiver.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--green);font-weight:700">01 · OVERVIEW</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Complete Hardware Prototype</h4>
+            <p style="font-size:12px;color:var(--muted)">Breadboard prototype with all modules interconnected via color-coded jumper wires.</p>
+          </div>
+        </div>
+
+        <!-- Image 2 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/adxl345_step_detection_walking_1793602474657.jpg" alt="Walking & Step Detection" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '02. Walking & Step Detection Test', 'Outdoor physical test of the ADXL345 dynamic impact sensor measuring footsteps while rejecting false shakes.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--green);font-weight:700">02 · STEP DETECTION</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Walking &amp; Step Detection Test</h4>
+            <p style="font-size:12px;color:var(--muted)">ADXL345 dynamic low-pass delta filter capturing real footfall impact pulses.</p>
+          </div>
+        </div>
+
+        <!-- Image 3 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/neo6m_gps_outdoor_tracking_1793602481978.jpg" alt="GPS Outdoor Tracking" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '03. GPS Outdoor Tracking & Distance', 'Outdoor field testing of the NEO-6M GPS receiver tracking distance (0.85 km) and speed (4.2 km/h).')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--blue);font-weight:700">03 · GPS TRACKING</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">GPS Outdoor Distance Tracking</h4>
+            <p style="font-size:12px;color:var(--muted)">Satellite coordinates stream over UART1 to validate movement and prevent indoor cheating.</p>
+          </div>
+        </div>
+
+        <!-- Image 4 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/oled_display_macro_1793602478614.jpg" alt="OLED Display Macro" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '04. OLED Display & 20s Progress Bar', 'Miniature 0.91-inch OLED showing the 4-frame stickman animation, motivational quotes, and the 20-second progress bar.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--purple);font-weight:700">04 · OLED DISPLAY</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">OLED &amp; 20s Progress Bar</h4>
+            <p style="font-size:12px;color:var(--muted)">128x32 display with walking stickman, speech text, step numbers, and accumulator bar.</p>
+          </div>
+        </div>
+
+        <!-- Image 5 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/relay_tv_power_control_png_1793602484986.jpg" alt="Relay TV Power Control" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '05. Relay TV Power Control (Active-LOW)', '5V relay switching television power. GPIO 2 LOW turns the TV on while countdown decrements steps.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--yellow);font-weight:700">05 · RELAY CONTROL</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Relay TV Power Control</h4>
+            <p style="font-size:12px;color:var(--muted)">5V relay module with IN1 LED indicator controlling appliance power based on steps.</p>
+          </div>
+        </div>
+
+        <!-- Image 6 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/science_fair_pedometer_booth_1793602519436.jpg" alt="Science Fair Booth" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '06. School Science Fair Exhibition Booth', 'Science competition presentation booth featuring the trifold poster board, breadboard prototype, and laptop simulator.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--green);font-weight:700">06 · EXHIBITION</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Science Fair Exhibition Booth</h4>
+            <p style="font-size:12px;color:var(--muted)">Project display poster, prototype table, and open laptop showing real-time telemetry.</p>
+          </div>
+        </div>
+
+        <!-- Image 7 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/esp32_c3_pin_wiring_macro_1793602843143.jpg" alt="ESP32-C3 Macro Wiring" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '07. ESP32-C3 Board & Pin Wiring Macro', 'High-detail macro photo of the ESP32-C3 dev board, status LEDs, USB-C interface, and DuPont jumper wires.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--blue);font-weight:700">07 · CONTROLLER</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">ESP32-C3 Board &amp; Wiring Macro</h4>
+            <p style="font-size:12px;color:var(--muted)">RISC-V 32-bit core running at 160MHz routing I2C, UART1, and GPIO signals.</p>
+          </div>
+        </div>
+
+        <!-- Image 8 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/wearable_pedometer_wristband_prototype_1793602840123.jpg" alt="Wearable Watch Concept" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '08. 3D-Printed Wearable Watch Enclosure', 'Commercial product design prototype showing the circuit miniaturized into a 3D-printed sports fitness watch.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--cyan);font-weight:700">08 · DESIGN CONCEPT</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">3D-Printed Wearable Watch</h4>
+            <p style="font-size:12px;color:var(--muted)">Custom enclosure packaging the OLED, battery, and sensors into a wearable wristband.</p>
+          </div>
+        </div>
+
+        <!-- Image 9 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/adxl345_sensor_calibration_multimeter_testing_1793602840082.jpg" alt="Sensor Calibration" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '09. ADXL345 Calibration & Multimeter Testing', 'Electronics bench measurement showing digital multimeter probes testing 3.3V and I2C SDA/SCL lines.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--yellow);font-weight:700">09 · TESTING</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">ADXL345 Calibration Testing</h4>
+            <p style="font-size:12px;color:var(--muted)">Voltage verification and oscilloscope tracing of I2C bus communications at 100 kHz.</p>
+          </div>
+        </div>
+
+        <!-- Image 10 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/neo6m_gps_antenna_macro_1793602846170.jpg" alt="GPS Antenna Macro" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '10. NEO-6M GPS Ceramic Antenna Macro', 'Close-up of the square ceramic patch antenna, U-blox receiver IC, backup battery, and active PPS LED.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--cyan);font-weight:700">10 · ANTENNA</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">NEO-6M GPS Antenna Macro</h4>
+            <p style="font-size:12px;color:var(--muted)">Ceramic receiver patch capturing satellite constellations with 1-pulse-per-second lock.</p>
+          </div>
+        </div>
+
+        <!-- Image 11 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/tv_power_cut_off_event_1793602878212.jpg" alt="TV Power Cut Event" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '11. TV Power Cut Event (Zero Steps Trigger)', 'The exact moment steps reach zero: relay de-energizes, OLED prompts Walk 2 get steps!, and the TV cuts off.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--red);font-weight:700">11 · CUT-OFF EVENT</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">TV Power Cut-Off Event</h4>
+            <p style="font-size:12px;color:var(--muted)">When step count reaches 0, the relay immediately opens and cuts TV power.</p>
+          </div>
+        </div>
+
+        <!-- Image 12 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/esp32_nvs_persistence_powerup_1793602889237.jpg" alt="NVS Memory Persistence" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '12. NVS Flash Memory Retention on Boot', 'Plugging in USB-C power demonstrates step restoration from flash memory without losing progress.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--green);font-weight:700">12 · MEMORY</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">NVS Flash Memory Retention</h4>
+            <p style="font-size:12px;color:var(--muted)">Survives reboots and power cuts by writing steps to ESP32 non-volatile storage.</p>
+          </div>
+        </div>
+
+        <!-- Image 13 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/student_breadboard_assembly_1793602893427.jpg" alt="Student Assembly" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '13. Student Breadboard Circuit Assembly', 'Hands-on construction showing wiring tweezers, wire strippers, printed pin table, and breadboard placement.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--yellow);font-weight:700">13 · STEM WORKSHOP</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Student Breadboard Assembly</h4>
+            <p style="font-size:12px;color:var(--muted)">Precision breadboard wiring using DuPont jumpers, tweezers, and circuit diagrams.</p>
+          </div>
+        </div>
+
+        <!-- Image 14 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/smart_pedometer_prototype_1793531618535.jpg" alt="Maker Prototype" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '14. Maker Workbench Prototype', 'The original working breadboard prototype operating on a wooden workshop desk with display luminescence.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--purple);font-weight:700">14 · FIRST BUILD</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Maker Workbench Prototype</h4>
+            <p style="font-size:12px;color:var(--muted)">Initial working prototype demonstrating circuit connectivity and LED luminescence.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- IMAGE LIGHTBOX MODAL -->
+<div id="imgModal" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:24px" onclick="closeModal()">
+  <div style="max-width:850px;width:100%;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;position:relative" onclick="event.stopPropagation()">
+    <button onclick="closeModal()" style="position:absolute;top:16px;right:16px;background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer;line-height:1">&times;</button>
+    <img id="modalImg" src="" alt="" style="width:100%;max-height:550px;object-fit:contain;border-radius:10px;background:#000;margin-bottom:14px"/>
+    <h3 id="modalTitle" style="font-size:1.1rem;margin-bottom:6px"></h3>
+    <p id="modalDesc" style="color:var(--muted);font-size:13px"></p>
+  </div>
+</div>
+
+<script>
+function openModal(src, title, desc){
+  document.getElementById('modalImg').src = src;
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalDesc').textContent = desc;
+  document.getElementById('imgModal').style.display = 'flex';
+}
+function closeModal(){
+  document.getElementById('imgModal').style.display = 'none';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+</script>
+
+<!-- ══════════════ TAB: WIRING ══════════════ -->
+<div class="tab-content" id="tab-wiring">
+  <section style="padding-top:40px">
+    <div class="sec-inner">
+      <div class="sec-label">Connections</div>
+      <h2>Full Pin Wiring Table</h2>
+      <p class="sub">Every wire from every component to the ESP32-C3</p>
+      <div class="wire-table-wrap">
+        <table>
+          <thead><tr><th>Component</th><th>Pin</th><th>ESP32-C3</th><th>Wire</th><th>Function</th></tr></thead>
+          <tbody>
+            <tr><td><strong>ADXL345</strong></td><td>VCC</td><td><span class="pbadge">3.3V</span></td><td><span class="dot" style="background:#ef4444"></span>Red</td><td>Sensor power</td></tr>
+            <tr><td><strong>ADXL345</strong></td><td>GND</td><td><span class="pbadge">GND</span></td><td><span class="dot" style="background:#374151;border:1px solid #6b7280"></span>Black</td><td>Ground</td></tr>
+            <tr><td><strong>ADXL345</strong></td><td>SDA</td><td><span class="pbadge">GPIO 4</span></td><td><span class="dot" style="background:#3b82f6"></span>Blue</td><td>I2C Data (shared bus)</td></tr>
+            <tr><td><strong>ADXL345</strong></td><td>SCL</td><td><span class="pbadge">GPIO 5</span></td><td><span class="dot" style="background:#e2e8f0"></span>White</td><td>I2C Clock (shared bus)</td></tr>
+            <tr><td><strong>SSD1306 OLED</strong></td><td>VCC</td><td><span class="pbadge">3.3V</span></td><td><span class="dot" style="background:#ef4444"></span>Red</td><td>Display power</td></tr>
+            <tr><td><strong>SSD1306 OLED</strong></td><td>GND</td><td><span class="pbadge">GND</span></td><td><span class="dot" style="background:#374151;border:1px solid #6b7280"></span>Black</td><td>Ground</td></tr>
+            <tr><td><strong>SSD1306 OLED</strong></td><td>SDA</td><td><span class="pbadge">GPIO 4</span></td><td><span class="dot" style="background:#3b82f6"></span>Blue</td><td>I2C Data (shared)</td></tr>
+            <tr><td><strong>SSD1306 OLED</strong></td><td>SCL</td><td><span class="pbadge">GPIO 5</span></td><td><span class="dot" style="background:#e2e8f0"></span>White</td><td>I2C Clock (shared)</td></tr>
+            <tr><td><strong>5V Relay</strong></td><td>VCC</td><td><span class="pbadge">5V VBUS</span></td><td><span class="dot" style="background:#ef4444"></span>Red</td><td>Coil power — must be 5V!</td></tr>
+            <tr><td><strong>5V Relay</strong></td><td>GND</td><td><span class="pbadge">GND</span></td><td><span class="dot" style="background:#374151;border:1px solid #6b7280"></span>Black</td><td>Ground</td></tr>
+            <tr><td><strong>5V Relay</strong></td><td>IN1</td><td><span class="pbadge">GPIO 2</span></td><td><span class="dot" style="background:#f59e0b"></span>Yellow</td><td>Control (Active-LOW)</td></tr>
+            <tr><td><strong>Relay Sense</strong></td><td>Sense Line</td><td><span class="pbadge">GPIO 6</span></td><td><span class="dot" style="background:#22c55e"></span>Green</td><td>Plug detect (INPUT_PULLUP → GND)</td></tr>
+            <tr><td><strong>NEO-6M GPS</strong></td><td>VCC</td><td><span class="pbadge">3.3V</span></td><td><span class="dot" style="background:#ef4444"></span>Red</td><td>GPS power</td></tr>
+            <tr><td><strong>NEO-6M GPS</strong></td><td>GND</td><td><span class="pbadge">GND</span></td><td><span class="dot" style="background:#374151;border:1px solid #6b7280"></span>Black</td><td>Ground</td></tr>
+            <tr><td><strong>NEO-6M GPS</strong></td><td>TX</td><td><span class="pbadge">GPIO 0</span></td><td><span class="dot" style="background:#e2e8f0"></span>White</td><td>NMEA → ESP32 UART1 RX</td></tr>
+            <tr><td><strong>NEO-6M GPS</strong></td><td>RX</td><td><span class="pbadge">GPIO 1</span></td><td><span class="dot" style="background:#06b6d4"></span>Cyan</td><td>ESP32 UART1 TX → GPS</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-top:32px">
+        <div style="background:var(--card2);border:1px solid #ef444433;border-radius:12px;padding:16px">
+          <div style="font-size:12px;font-weight:700;color:#ef4444;margin-bottom:8px">🔴 Power (Red)</div>
+          <p style="font-size:13px;color:var(--muted)">3.3V for ADXL345, OLED, GPS. 5V VBUS for relay coil only.</p>
+        </div>
+        <div style="background:var(--card2);border:1px solid #3b82f633;border-radius:12px;padding:16px">
+          <div style="font-size:12px;font-weight:700;color:#3b82f6;margin-bottom:8px">🔵 I2C Bus (Blue/White)</div>
+          <p style="font-size:13px;color:var(--muted)">Shared I2C bus on GPIO 4 (SDA) and GPIO 5 (SCL). ADXL345 at 0x53, OLED at 0x3C.</p>
+        </div>
+        <div style="background:var(--card2);border:1px solid #f59e0b33;border-radius:12px;padding:16px">
+          <div style="font-size:12px;font-weight:700;color:#f59e0b;margin-bottom:8px">🟡 Relay (Yellow/Green)</div>
+          <p style="font-size:13px;color:var(--muted)">GPIO 2 = Active-LOW control. GPIO 6 = sense line wired to GND on relay board.</p>
+        </div>
+        <div style="background:var(--card2);border:1px solid #06b6d433;border-radius:12px;padding:16px">
+          <div style="font-size:12px;font-weight:700;color:#06b6d4;margin-bottom:8px">🩵 UART GPS (White/Cyan)</div>
+          <p style="font-size:13px;color:var(--muted)">GPIO 0 (RX from GPS TX) and GPIO 1 (TX to GPS RX). HardwareSerial(1) at 9600 baud.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ══════════════ TAB: GALLERY (14 IMAGES) ══════════════ -->
+<div class="tab-content" id="tab-gallery">
+  <section style="padding-top:40px">
+    <div class="sec-inner">
+      <div class="sec-label">Project Gallery</div>
+      <h2>Hardware &amp; System Photographs (14)</h2>
+      <p class="sub">Click any image to enlarge and inspect details</p>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;">
+        
+        <!-- Image 1 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/hardware_prototype_overview_1793602478676.jpg" alt="Complete Hardware Prototype" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '01. Complete Hardware Prototype', 'Full breadboard assembly of the ESP32-C3, ADXL345 accelerometer, SSD1306 OLED, 5V relay module, and NEO-6M GPS receiver.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--green);font-weight:700">01 · OVERVIEW</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Complete Hardware Prototype</h4>
+            <p style="font-size:12px;color:var(--muted)">Breadboard prototype with all modules interconnected via color-coded jumper wires.</p>
+          </div>
+        </div>
+
+        <!-- Image 2 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/adxl345_step_detection_walking_1793602474657.jpg" alt="Walking & Step Detection" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '02. Walking & Step Detection Test', 'Outdoor physical test of the ADXL345 dynamic impact sensor measuring footsteps while rejecting false shakes.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--green);font-weight:700">02 · STEP DETECTION</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Walking &amp; Step Detection Test</h4>
+            <p style="font-size:12px;color:var(--muted)">ADXL345 dynamic low-pass delta filter capturing real footfall impact pulses.</p>
+          </div>
+        </div>
+
+        <!-- Image 3 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/neo6m_gps_outdoor_tracking_1793602481978.jpg" alt="GPS Outdoor Tracking" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '03. GPS Outdoor Tracking & Distance', 'Outdoor field testing of the NEO-6M GPS receiver tracking distance (0.85 km) and speed (4.2 km/h).')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--blue);font-weight:700">03 · GPS TRACKING</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">GPS Outdoor Distance Tracking</h4>
+            <p style="font-size:12px;color:var(--muted)">Satellite coordinates stream over UART1 to validate movement and prevent indoor cheating.</p>
+          </div>
+        </div>
+
+        <!-- Image 4 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/oled_display_macro_1793602478614.jpg" alt="OLED Display Macro" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '04. OLED Display & 20s Progress Bar', 'Miniature 0.91-inch OLED showing the 4-frame stickman animation, motivational quotes, and the 20-second progress bar.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--purple);font-weight:700">04 · OLED DISPLAY</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">OLED &amp; 20s Progress Bar</h4>
+            <p style="font-size:12px;color:var(--muted)">128x32 display with walking stickman, speech text, step numbers, and accumulator bar.</p>
+          </div>
+        </div>
+
+        <!-- Image 5 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/relay_tv_power_control_png_1793602484986.jpg" alt="Relay TV Power Control" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '05. Relay TV Power Control (Active-LOW)', '5V relay switching television power. GPIO 2 LOW turns the TV on while countdown decrements steps.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--yellow);font-weight:700">05 · RELAY CONTROL</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Relay TV Power Control</h4>
+            <p style="font-size:12px;color:var(--muted)">5V relay module with IN1 LED indicator controlling appliance power based on steps.</p>
+          </div>
+        </div>
+
+        <!-- Image 6 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/science_fair_pedometer_booth_1793602519436.jpg" alt="Science Fair Booth" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '06. School Science Fair Exhibition Booth', 'Science competition presentation booth featuring the trifold poster board, breadboard prototype, and laptop simulator.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--green);font-weight:700">06 · EXHIBITION</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Science Fair Exhibition Booth</h4>
+            <p style="font-size:12px;color:var(--muted)">Project display poster, prototype table, and open laptop showing real-time telemetry.</p>
+          </div>
+        </div>
+
+        <!-- Image 7 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/esp32_c3_pin_wiring_macro_1793602843143.jpg" alt="ESP32-C3 Macro Wiring" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '07. ESP32-C3 Board & Pin Wiring Macro', 'High-detail macro photo of the ESP32-C3 dev board, status LEDs, USB-C interface, and DuPont jumper wires.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--blue);font-weight:700">07 · CONTROLLER</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">ESP32-C3 Board &amp; Wiring Macro</h4>
+            <p style="font-size:12px;color:var(--muted)">RISC-V 32-bit core running at 160MHz routing I2C, UART1, and GPIO signals.</p>
+          </div>
+        </div>
+
+        <!-- Image 8 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/wearable_pedometer_wristband_prototype_1793602840123.jpg" alt="Wearable Watch Concept" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '08. 3D-Printed Wearable Watch Enclosure', 'Commercial product design prototype showing the circuit miniaturized into a 3D-printed sports fitness watch.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--cyan);font-weight:700">08 · DESIGN CONCEPT</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">3D-Printed Wearable Watch</h4>
+            <p style="font-size:12px;color:var(--muted)">Custom enclosure packaging the OLED, battery, and sensors into a wearable wristband.</p>
+          </div>
+        </div>
+
+        <!-- Image 9 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/adxl345_sensor_calibration_multimeter_testing_1793602840082.jpg" alt="Sensor Calibration" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '09. ADXL345 Calibration & Multimeter Testing', 'Electronics bench measurement showing digital multimeter probes testing 3.3V and I2C SDA/SCL lines.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--yellow);font-weight:700">09 · TESTING</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">ADXL345 Calibration Testing</h4>
+            <p style="font-size:12px;color:var(--muted)">Voltage verification and oscilloscope tracing of I2C bus communications at 100 kHz.</p>
+          </div>
+        </div>
+
+        <!-- Image 10 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/neo6m_gps_antenna_macro_1793602846170.jpg" alt="GPS Antenna Macro" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '10. NEO-6M GPS Ceramic Antenna Macro', 'Close-up of the square ceramic patch antenna, U-blox receiver IC, backup battery, and active PPS LED.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--cyan);font-weight:700">10 · ANTENNA</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">NEO-6M GPS Antenna Macro</h4>
+            <p style="font-size:12px;color:var(--muted)">Ceramic receiver patch capturing satellite constellations with 1-pulse-per-second lock.</p>
+          </div>
+        </div>
+
+        <!-- Image 11 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/tv_power_cut_off_event_1793602878212.jpg" alt="TV Power Cut Event" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '11. TV Power Cut Event (Zero Steps Trigger)', 'The exact moment steps reach zero: relay de-energizes, OLED prompts Walk 2 get steps!, and the TV cuts off.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--red);font-weight:700">11 · CUT-OFF EVENT</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">TV Power Cut-Off Event</h4>
+            <p style="font-size:12px;color:var(--muted)">When step count reaches 0, the relay immediately opens and cuts TV power.</p>
+          </div>
+        </div>
+
+        <!-- Image 12 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/esp32_nvs_persistence_powerup_1793602889237.jpg" alt="NVS Memory Persistence" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '12. NVS Flash Memory Retention on Boot', 'Plugging in USB-C power demonstrates step restoration from flash memory without losing progress.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--green);font-weight:700">12 · MEMORY</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">NVS Flash Memory Retention</h4>
+            <p style="font-size:12px;color:var(--muted)">Survives reboots and power cuts by writing steps to ESP32 non-volatile storage.</p>
+          </div>
+        </div>
+
+        <!-- Image 13 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/student_breadboard_assembly_1793602893427.jpg" alt="Student Assembly" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '13. Student Breadboard Circuit Assembly', 'Hands-on construction showing wiring tweezers, wire strippers, printed pin table, and breadboard placement.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--yellow);font-weight:700">13 · STEM WORKSHOP</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Student Breadboard Assembly</h4>
+            <p style="font-size:12px;color:var(--muted)">Precision breadboard wiring using DuPont jumpers, tweezers, and circuit diagrams.</p>
+          </div>
+        </div>
+
+        <!-- Image 14 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/smart_pedometer_prototype_1793531618535.jpg" alt="Maker Prototype" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '14. Maker Workbench Prototype', 'The original working breadboard prototype operating on a wooden workshop desk with display luminescence.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--purple);font-weight:700">14 · FIRST BUILD</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Maker Workbench Prototype</h4>
+            <p style="font-size:12px;color:var(--muted)">Initial working prototype demonstrating circuit connectivity and LED luminescence.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- IMAGE LIGHTBOX MODAL -->
+<div id="imgModal" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:24px" onclick="closeModal()">
+  <div style="max-width:850px;width:100%;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;position:relative" onclick="event.stopPropagation()">
+    <button onclick="closeModal()" style="position:absolute;top:16px;right:16px;background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer;line-height:1">&times;</button>
+    <img id="modalImg" src="" alt="" style="width:100%;max-height:550px;object-fit:contain;border-radius:10px;background:#000;margin-bottom:14px"/>
+    <h3 id="modalTitle" style="font-size:1.1rem;margin-bottom:6px"></h3>
+    <p id="modalDesc" style="color:var(--muted);font-size:13px"></p>
+  </div>
+</div>
+
+<script>
+function openModal(src, title, desc){
+  document.getElementById('modalImg').src = src;
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalDesc').textContent = desc;
+  document.getElementById('imgModal').style.display = 'flex';
+}
+function closeModal(){
+  document.getElementById('imgModal').style.display = 'none';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+</script>
+
+<!-- ══════════════ TAB: MEMORY ══════════════ -->
+<div class="tab-content" id="tab-memory">
+  <section style="padding-top:40px">
+    <div class="sec-inner">
+      <div class="sec-label">NVS Flash Storage</div>
+      <h2>Persistent Memory</h2>
+      <p class="sub">Steps are never lost — even when the power is cut</p>
+
+      <div class="mem-anim">
+        <div class="mem-block">
+          <div style="font-size:1.5rem;margin-bottom:8px">🔑</div>
+          <div class="mem-key">"steps"</div>
+          <div class="mem-val" id="memSteps" style="color:var(--green)">0</div>
+          <div class="mem-type">int · namespace: pedometer</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:8px">Saved when step is earned and every TV countdown tick</div>
+        </div>
+        <div class="mem-block">
+          <div style="font-size:1.5rem;margin-bottom:8px">🔑</div>
+          <div class="mem-key">"walkAcc"</div>
+          <div class="mem-val" id="memAcc" style="color:var(--cyan)">0</div>
+          <div class="mem-type">unsigned long (ms) · namespace: pedometer</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:8px">Saved every 5 seconds + when a step is earned</div>
+        </div>
+      </div>
+
+      <div style="margin-top:32px;background:var(--card2);border:1px solid #00ff7722;border-radius:14px;padding:24px;max-width:700px;margin:32px auto 0">
+        <div style="font-weight:700;color:var(--green);margin-bottom:12px">💡 Boot Sequence</div>
+        <div style="font-family:monospace;font-size:13px;line-height:2.2;color:var(--muted)">
+          <div><span style="color:#a78bfa">preferences.begin("pedometer", false)</span></div>
+          <div><span style="color:#4ade80">stepCount = preferences.getInt("steps", 0)</span> &nbsp;← loads your steps</div>
+          <div><span style="color:#22d3ee">walkingAccumulatorMs = preferences.getULong("walkAcc", 0)</span> &nbsp;← loads progress</div>
+          <div style="margin-top:8px"><span style="color:#e2e8f0">OLED shows: <span style="color:var(--green)">"Steps saved: X"</span></span></div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-top:24px;max-width:700px;margin:24px auto 0">
+        <div style="background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center">
+          <div style="font-size:1.5rem;margin-bottom:8px">⚡</div>
+          <div style="font-weight:700;margin-bottom:6px">Power Cut</div>
+          <div style="font-size:13px;color:var(--muted)">Lose at most <strong style="color:var(--yellow)">5 seconds</strong> of walking progress</div>
+        </div>
+        <div style="background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center">
+          <div style="font-size:1.5rem;margin-bottom:8px">🔄</div>
+          <div style="font-weight:700;margin-bottom:6px">Reboot</div>
+          <div style="font-size:13px;color:var(--muted)"><strong style="color:var(--green)">Zero</strong> steps lost — full restore from NVS</div>
+        </div>
+        <div style="background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center">
+          <div style="font-size:1.5rem;margin-bottom:8px">📝</div>
+          <div style="font-weight:700;margin-bottom:6px">Write Cycles</div>
+          <div style="font-size:13px;color:var(--muted)">ESP32 NVS rated for <strong style="color:var(--blue)">~100,000</strong> write cycles</div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ══════════════ TAB: GALLERY (14 IMAGES) ══════════════ -->
+<div class="tab-content" id="tab-gallery">
+  <section style="padding-top:40px">
+    <div class="sec-inner">
+      <div class="sec-label">Project Gallery</div>
+      <h2>Hardware &amp; System Photographs (14)</h2>
+      <p class="sub">Click any image to enlarge and inspect details</p>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;">
+        
+        <!-- Image 1 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/hardware_prototype_overview_1793602478676.jpg" alt="Complete Hardware Prototype" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '01. Complete Hardware Prototype', 'Full breadboard assembly of the ESP32-C3, ADXL345 accelerometer, SSD1306 OLED, 5V relay module, and NEO-6M GPS receiver.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--green);font-weight:700">01 · OVERVIEW</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Complete Hardware Prototype</h4>
+            <p style="font-size:12px;color:var(--muted)">Breadboard prototype with all modules interconnected via color-coded jumper wires.</p>
+          </div>
+        </div>
+
+        <!-- Image 2 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/adxl345_step_detection_walking_1793602474657.jpg" alt="Walking & Step Detection" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '02. Walking & Step Detection Test', 'Outdoor physical test of the ADXL345 dynamic impact sensor measuring footsteps while rejecting false shakes.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--green);font-weight:700">02 · STEP DETECTION</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Walking &amp; Step Detection Test</h4>
+            <p style="font-size:12px;color:var(--muted)">ADXL345 dynamic low-pass delta filter capturing real footfall impact pulses.</p>
+          </div>
+        </div>
+
+        <!-- Image 3 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/neo6m_gps_outdoor_tracking_1793602481978.jpg" alt="GPS Outdoor Tracking" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '03. GPS Outdoor Tracking & Distance', 'Outdoor field testing of the NEO-6M GPS receiver tracking distance (0.85 km) and speed (4.2 km/h).')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--blue);font-weight:700">03 · GPS TRACKING</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">GPS Outdoor Distance Tracking</h4>
+            <p style="font-size:12px;color:var(--muted)">Satellite coordinates stream over UART1 to validate movement and prevent indoor cheating.</p>
+          </div>
+        </div>
+
+        <!-- Image 4 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/oled_display_macro_1793602478614.jpg" alt="OLED Display Macro" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '04. OLED Display & 20s Progress Bar', 'Miniature 0.91-inch OLED showing the 4-frame stickman animation, motivational quotes, and the 20-second progress bar.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--purple);font-weight:700">04 · OLED DISPLAY</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">OLED &amp; 20s Progress Bar</h4>
+            <p style="font-size:12px;color:var(--muted)">128x32 display with walking stickman, speech text, step numbers, and accumulator bar.</p>
+          </div>
+        </div>
+
+        <!-- Image 5 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/relay_tv_power_control_png_1793602484986.jpg" alt="Relay TV Power Control" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '05. Relay TV Power Control (Active-LOW)', '5V relay switching television power. GPIO 2 LOW turns the TV on while countdown decrements steps.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--yellow);font-weight:700">05 · RELAY CONTROL</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Relay TV Power Control</h4>
+            <p style="font-size:12px;color:var(--muted)">5V relay module with IN1 LED indicator controlling appliance power based on steps.</p>
+          </div>
+        </div>
+
+        <!-- Image 6 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/science_fair_pedometer_booth_1793602519436.jpg" alt="Science Fair Booth" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '06. School Science Fair Exhibition Booth', 'Science competition presentation booth featuring the trifold poster board, breadboard prototype, and laptop simulator.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--green);font-weight:700">06 · EXHIBITION</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Science Fair Exhibition Booth</h4>
+            <p style="font-size:12px;color:var(--muted)">Project display poster, prototype table, and open laptop showing real-time telemetry.</p>
+          </div>
+        </div>
+
+        <!-- Image 7 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/esp32_c3_pin_wiring_macro_1793602843143.jpg" alt="ESP32-C3 Macro Wiring" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '07. ESP32-C3 Board & Pin Wiring Macro', 'High-detail macro photo of the ESP32-C3 dev board, status LEDs, USB-C interface, and DuPont jumper wires.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--blue);font-weight:700">07 · CONTROLLER</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">ESP32-C3 Board &amp; Wiring Macro</h4>
+            <p style="font-size:12px;color:var(--muted)">RISC-V 32-bit core running at 160MHz routing I2C, UART1, and GPIO signals.</p>
+          </div>
+        </div>
+
+        <!-- Image 8 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/wearable_pedometer_wristband_prototype_1793602840123.jpg" alt="Wearable Watch Concept" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '08. 3D-Printed Wearable Watch Enclosure', 'Commercial product design prototype showing the circuit miniaturized into a 3D-printed sports fitness watch.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--cyan);font-weight:700">08 · DESIGN CONCEPT</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">3D-Printed Wearable Watch</h4>
+            <p style="font-size:12px;color:var(--muted)">Custom enclosure packaging the OLED, battery, and sensors into a wearable wristband.</p>
+          </div>
+        </div>
+
+        <!-- Image 9 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/adxl345_sensor_calibration_multimeter_testing_1793602840082.jpg" alt="Sensor Calibration" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '09. ADXL345 Calibration & Multimeter Testing', 'Electronics bench measurement showing digital multimeter probes testing 3.3V and I2C SDA/SCL lines.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--yellow);font-weight:700">09 · TESTING</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">ADXL345 Calibration Testing</h4>
+            <p style="font-size:12px;color:var(--muted)">Voltage verification and oscilloscope tracing of I2C bus communications at 100 kHz.</p>
+          </div>
+        </div>
+
+        <!-- Image 10 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/neo6m_gps_antenna_macro_1793602846170.jpg" alt="GPS Antenna Macro" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '10. NEO-6M GPS Ceramic Antenna Macro', 'Close-up of the square ceramic patch antenna, U-blox receiver IC, backup battery, and active PPS LED.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--cyan);font-weight:700">10 · ANTENNA</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">NEO-6M GPS Antenna Macro</h4>
+            <p style="font-size:12px;color:var(--muted)">Ceramic receiver patch capturing satellite constellations with 1-pulse-per-second lock.</p>
+          </div>
+        </div>
+
+        <!-- Image 11 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/tv_power_cut_off_event_1793602878212.jpg" alt="TV Power Cut Event" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '11. TV Power Cut Event (Zero Steps Trigger)', 'The exact moment steps reach zero: relay de-energizes, OLED prompts Walk 2 get steps!, and the TV cuts off.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--red);font-weight:700">11 · CUT-OFF EVENT</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">TV Power Cut-Off Event</h4>
+            <p style="font-size:12px;color:var(--muted)">When step count reaches 0, the relay immediately opens and cuts TV power.</p>
+          </div>
+        </div>
+
+        <!-- Image 12 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/esp32_nvs_persistence_powerup_1793602889237.jpg" alt="NVS Memory Persistence" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '12. NVS Flash Memory Retention on Boot', 'Plugging in USB-C power demonstrates step restoration from flash memory without losing progress.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--green);font-weight:700">12 · MEMORY</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">NVS Flash Memory Retention</h4>
+            <p style="font-size:12px;color:var(--muted)">Survives reboots and power cuts by writing steps to ESP32 non-volatile storage.</p>
+          </div>
+        </div>
+
+        <!-- Image 13 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/student_breadboard_assembly_1793602893427.jpg" alt="Student Assembly" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '13. Student Breadboard Circuit Assembly', 'Hands-on construction showing wiring tweezers, wire strippers, printed pin table, and breadboard placement.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--yellow);font-weight:700">13 · STEM WORKSHOP</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Student Breadboard Assembly</h4>
+            <p style="font-size:12px;color:var(--muted)">Precision breadboard wiring using DuPont jumpers, tweezers, and circuit diagrams.</p>
+          </div>
+        </div>
+
+        <!-- Image 14 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/smart_pedometer_prototype_1793531618535.jpg" alt="Maker Prototype" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '14. Maker Workbench Prototype', 'The original working breadboard prototype operating on a wooden workshop desk with display luminescence.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--purple);font-weight:700">14 · FIRST BUILD</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Maker Workbench Prototype</h4>
+            <p style="font-size:12px;color:var(--muted)">Initial working prototype demonstrating circuit connectivity and LED luminescence.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- IMAGE LIGHTBOX MODAL -->
+<div id="imgModal" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:24px" onclick="closeModal()">
+  <div style="max-width:850px;width:100%;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;position:relative" onclick="event.stopPropagation()">
+    <button onclick="closeModal()" style="position:absolute;top:16px;right:16px;background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer;line-height:1">&times;</button>
+    <img id="modalImg" src="" alt="" style="width:100%;max-height:550px;object-fit:contain;border-radius:10px;background:#000;margin-bottom:14px"/>
+    <h3 id="modalTitle" style="font-size:1.1rem;margin-bottom:6px"></h3>
+    <p id="modalDesc" style="color:var(--muted);font-size:13px"></p>
+  </div>
+</div>
+
+<script>
+function openModal(src, title, desc){
+  document.getElementById('modalImg').src = src;
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalDesc').textContent = desc;
+  document.getElementById('imgModal').style.display = 'flex';
+}
+function closeModal(){
+  document.getElementById('imgModal').style.display = 'none';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+</script>
+
+<!-- ══════════════ TAB: HOW IT WORKS ══════════════ -->
+<div class="tab-content" id="tab-howworks">
+  <section style="padding-top:40px">
+    <div class="sec-inner">
+      <div class="sec-label">System Flow</div>
+      <h2>How It Works — Step by Step</h2>
+      <p class="sub">From your footstep to the TV turning on</p>
+      <div class="flow">
+        <div class="flow-step"><div class="flow-col"><div class="flow-dot">1</div><div class="flow-line"></div></div>
+          <div class="flow-body"><h3>👟 Footfall detected by ADXL345</h3><p>Reads X/Y/Z acceleration at ~50Hz. A dynamic low-pass filter isolates the spike. When <code style="color:var(--green)">dynamicDelta &gt; 2.5 m/s²</code> and 400ms debounce passes → footfall registered.</p></div></div>
+        <div class="flow-step"><div class="flow-col"><div class="flow-dot">2</div><div class="flow-line"></div></div>
+          <div class="flow-body"><h3>🛰️ GPS validates movement</h3><p>If NEO-6M has a satellite fix, checks speed. Under 0.5 km/h → user is stationary → accumulator gated. No fix (indoors) → falls back to ADXL345 only.</p></div></div>
+        <div class="flow-step"><div class="flow-col"><div class="flow-dot">3</div><div class="flow-line"></div></div>
+          <div class="flow-body"><h3>⏱️ 20-second accumulator fills</h3><p><code style="color:var(--cyan)">walkingAccumulatorMs</code> increments each millisecond of active walking. At 20,000ms → 1 TV step awarded. Remainder carries over. Pauses when you stop.</p></div></div>
+        <div class="flow-step"><div class="flow-col"><div class="flow-dot">4</div><div class="flow-line"></div></div>
+          <div class="flow-body"><h3>💾 Saved to NVS flash</h3><p>Both <code style="color:var(--green)">"steps"</code> and <code style="color:var(--cyan)">"walkAcc"</code> written to flash instantly when a step is earned, and every 5 seconds during walking.</p></div></div>
+        <div class="flow-step"><div class="flow-col"><div class="flow-dot">5</div><div class="flow-line"></div></div>
+          <div class="flow-body"><h3>🔌 Relay sense pin checks (GPIO 6)</h3><p>INPUT_PULLUP on GPIO 6. Relay plugged in → reads LOW. Unplugged → reads HIGH. Countdown only runs when relay is physically connected.</p></div></div>
+        <div class="flow-step"><div class="flow-col"><div class="flow-dot">6</div><div class="flow-line"></div></div>
+          <div class="flow-body"><h3>📺 TV powered via relay (GPIO 2)</h3><p>When relay connected AND <code style="color:var(--yellow)">stepCount &gt; 0</code>: GPIO 2 → LOW (Active-LOW) → relay closes → TV on. Every 1 second: <code>stepCount--</code>.</p></div></div>
+        <div class="flow-step"><div class="flow-col"><div class="flow-dot">7</div></div>
+          <div class="flow-body"><h3>⛔ Steps hit zero — TV off</h3><p>When <code style="color:var(--red)">stepCount == 0</code>: GPIO 2 → HIGH → relay opens → TV cuts off. OLED shows "Walk 2 get steps!" Go walk more!</p></div></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ══════════════ TAB: GALLERY (14 IMAGES) ══════════════ -->
+<div class="tab-content" id="tab-gallery">
+  <section style="padding-top:40px">
+    <div class="sec-inner">
+      <div class="sec-label">Project Gallery</div>
+      <h2>Hardware &amp; System Photographs (14)</h2>
+      <p class="sub">Click any image to enlarge and inspect details</p>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;">
+        
+        <!-- Image 1 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/hardware_prototype_overview_1793602478676.jpg" alt="Complete Hardware Prototype" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '01. Complete Hardware Prototype', 'Full breadboard assembly of the ESP32-C3, ADXL345 accelerometer, SSD1306 OLED, 5V relay module, and NEO-6M GPS receiver.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--green);font-weight:700">01 · OVERVIEW</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Complete Hardware Prototype</h4>
+            <p style="font-size:12px;color:var(--muted)">Breadboard prototype with all modules interconnected via color-coded jumper wires.</p>
+          </div>
+        </div>
+
+        <!-- Image 2 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/adxl345_step_detection_walking_1793602474657.jpg" alt="Walking & Step Detection" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '02. Walking & Step Detection Test', 'Outdoor physical test of the ADXL345 dynamic impact sensor measuring footsteps while rejecting false shakes.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--green);font-weight:700">02 · STEP DETECTION</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Walking &amp; Step Detection Test</h4>
+            <p style="font-size:12px;color:var(--muted)">ADXL345 dynamic low-pass delta filter capturing real footfall impact pulses.</p>
+          </div>
+        </div>
+
+        <!-- Image 3 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/neo6m_gps_outdoor_tracking_1793602481978.jpg" alt="GPS Outdoor Tracking" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '03. GPS Outdoor Tracking & Distance', 'Outdoor field testing of the NEO-6M GPS receiver tracking distance (0.85 km) and speed (4.2 km/h).')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--blue);font-weight:700">03 · GPS TRACKING</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">GPS Outdoor Distance Tracking</h4>
+            <p style="font-size:12px;color:var(--muted)">Satellite coordinates stream over UART1 to validate movement and prevent indoor cheating.</p>
+          </div>
+        </div>
+
+        <!-- Image 4 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/oled_display_macro_1793602478614.jpg" alt="OLED Display Macro" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '04. OLED Display & 20s Progress Bar', 'Miniature 0.91-inch OLED showing the 4-frame stickman animation, motivational quotes, and the 20-second progress bar.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--purple);font-weight:700">04 · OLED DISPLAY</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">OLED &amp; 20s Progress Bar</h4>
+            <p style="font-size:12px;color:var(--muted)">128x32 display with walking stickman, speech text, step numbers, and accumulator bar.</p>
+          </div>
+        </div>
+
+        <!-- Image 5 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/relay_tv_power_control_png_1793602484986.jpg" alt="Relay TV Power Control" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '05. Relay TV Power Control (Active-LOW)', '5V relay switching television power. GPIO 2 LOW turns the TV on while countdown decrements steps.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--yellow);font-weight:700">05 · RELAY CONTROL</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Relay TV Power Control</h4>
+            <p style="font-size:12px;color:var(--muted)">5V relay module with IN1 LED indicator controlling appliance power based on steps.</p>
+          </div>
+        </div>
+
+        <!-- Image 6 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/science_fair_pedometer_booth_1793602519436.jpg" alt="Science Fair Booth" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '06. School Science Fair Exhibition Booth', 'Science competition presentation booth featuring the trifold poster board, breadboard prototype, and laptop simulator.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--green);font-weight:700">06 · EXHIBITION</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Science Fair Exhibition Booth</h4>
+            <p style="font-size:12px;color:var(--muted)">Project display poster, prototype table, and open laptop showing real-time telemetry.</p>
+          </div>
+        </div>
+
+        <!-- Image 7 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/esp32_c3_pin_wiring_macro_1793602843143.jpg" alt="ESP32-C3 Macro Wiring" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '07. ESP32-C3 Board & Pin Wiring Macro', 'High-detail macro photo of the ESP32-C3 dev board, status LEDs, USB-C interface, and DuPont jumper wires.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--blue);font-weight:700">07 · CONTROLLER</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">ESP32-C3 Board &amp; Wiring Macro</h4>
+            <p style="font-size:12px;color:var(--muted)">RISC-V 32-bit core running at 160MHz routing I2C, UART1, and GPIO signals.</p>
+          </div>
+        </div>
+
+        <!-- Image 8 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/wearable_pedometer_wristband_prototype_1793602840123.jpg" alt="Wearable Watch Concept" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '08. 3D-Printed Wearable Watch Enclosure', 'Commercial product design prototype showing the circuit miniaturized into a 3D-printed sports fitness watch.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--cyan);font-weight:700">08 · DESIGN CONCEPT</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">3D-Printed Wearable Watch</h4>
+            <p style="font-size:12px;color:var(--muted)">Custom enclosure packaging the OLED, battery, and sensors into a wearable wristband.</p>
+          </div>
+        </div>
+
+        <!-- Image 9 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/adxl345_sensor_calibration_multimeter_testing_1793602840082.jpg" alt="Sensor Calibration" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '09. ADXL345 Calibration & Multimeter Testing', 'Electronics bench measurement showing digital multimeter probes testing 3.3V and I2C SDA/SCL lines.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--yellow);font-weight:700">09 · TESTING</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">ADXL345 Calibration Testing</h4>
+            <p style="font-size:12px;color:var(--muted)">Voltage verification and oscilloscope tracing of I2C bus communications at 100 kHz.</p>
+          </div>
+        </div>
+
+        <!-- Image 10 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/neo6m_gps_antenna_macro_1793602846170.jpg" alt="GPS Antenna Macro" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '10. NEO-6M GPS Ceramic Antenna Macro', 'Close-up of the square ceramic patch antenna, U-blox receiver IC, backup battery, and active PPS LED.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--cyan);font-weight:700">10 · ANTENNA</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">NEO-6M GPS Antenna Macro</h4>
+            <p style="font-size:12px;color:var(--muted)">Ceramic receiver patch capturing satellite constellations with 1-pulse-per-second lock.</p>
+          </div>
+        </div>
+
+        <!-- Image 11 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/tv_power_cut_off_event_1793602878212.jpg" alt="TV Power Cut Event" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '11. TV Power Cut Event (Zero Steps Trigger)', 'The exact moment steps reach zero: relay de-energizes, OLED prompts Walk 2 get steps!, and the TV cuts off.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--red);font-weight:700">11 · CUT-OFF EVENT</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">TV Power Cut-Off Event</h4>
+            <p style="font-size:12px;color:var(--muted)">When step count reaches 0, the relay immediately opens and cuts TV power.</p>
+          </div>
+        </div>
+
+        <!-- Image 12 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/esp32_nvs_persistence_powerup_1793602889237.jpg" alt="NVS Memory Persistence" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '12. NVS Flash Memory Retention on Boot', 'Plugging in USB-C power demonstrates step restoration from flash memory without losing progress.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--green);font-weight:700">12 · MEMORY</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">NVS Flash Memory Retention</h4>
+            <p style="font-size:12px;color:var(--muted)">Survives reboots and power cuts by writing steps to ESP32 non-volatile storage.</p>
+          </div>
+        </div>
+
+        <!-- Image 13 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/student_breadboard_assembly_1793602893427.jpg" alt="Student Assembly" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '13. Student Breadboard Circuit Assembly', 'Hands-on construction showing wiring tweezers, wire strippers, printed pin table, and breadboard placement.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--yellow);font-weight:700">13 · STEM WORKSHOP</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Student Breadboard Assembly</h4>
+            <p style="font-size:12px;color:var(--muted)">Precision breadboard wiring using DuPont jumpers, tweezers, and circuit diagrams.</p>
+          </div>
+        </div>
+
+        <!-- Image 14 -->
+        <div class="fcard" style="padding:14px;overflow:hidden">
+          <img src="images/smart_pedometer_prototype_1793531618535.jpg" alt="Maker Prototype" style="width:100%;height:180px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--border)" onclick="openModal(this.src, '14. Maker Workbench Prototype', 'The original working breadboard prototype operating on a wooden workshop desk with display luminescence.')"/>
+          <div style="padding:10px 4px 4px">
+            <div style="font-size:11px;color:var(--purple);font-weight:700">14 · FIRST BUILD</div>
+            <h4 style="font-size:14px;margin:4px 0 6px">Maker Workbench Prototype</h4>
+            <p style="font-size:12px;color:var(--muted)">Initial working prototype demonstrating circuit connectivity and LED luminescence.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- IMAGE LIGHTBOX MODAL -->
+<div id="imgModal" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:24px" onclick="closeModal()">
+  <div style="max-width:850px;width:100%;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;position:relative" onclick="event.stopPropagation()">
+    <button onclick="closeModal()" style="position:absolute;top:16px;right:16px;background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer;line-height:1">&times;</button>
+    <img id="modalImg" src="" alt="" style="width:100%;max-height:550px;object-fit:contain;border-radius:10px;background:#000;margin-bottom:14px"/>
+    <h3 id="modalTitle" style="font-size:1.1rem;margin-bottom:6px"></h3>
+    <p id="modalDesc" style="color:var(--muted);font-size:13px"></p>
+  </div>
+</div>
+
+<script>
+function openModal(src, title, desc){
+  document.getElementById('modalImg').src = src;
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalDesc').textContent = desc;
+  document.getElementById('imgModal').style.display = 'flex';
+}
+function closeModal(){
+  document.getElementById('imgModal').style.display = 'none';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+</script>
+
+<footer style="text-align:center;padding:32px 24px;border-top:1px solid var(--border);color:var(--muted);font-size:13px">
+  <p>ESP32-C3 Smart Pedometer &amp; TV Relay Controller · School Project</p>
+  <p style="margin-top:4px">ADXL345 · SSD1306 · NEO-6M GPS · TinyGPS++ · Adafruit Libraries</p>
+</footer>
+
+<script>
+// ══════════════════════════════
+// TAB SWITCHING
+// ══════════════════════════════
+function showTab(id,btn){
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ══════════════════════════════
+// CIRCUIT COMPONENT INFO
+// ══════════════════════════════
+const compData = {
+  esp32:{
+    title:'ESP32-C3 Microcontroller',
+    desc:'The brain of the project. RISC-V 32-bit core running at 160MHz with built-in WiFi & Bluetooth. Controls all peripherals via I2C, UART, and GPIO.',
+    pins:['GPIO 0 → GPS RX','GPIO 1 → GPS TX','GPIO 2 → Relay IN1','GPIO 4 → I2C SDA','GPIO 5 → I2C SCL','GPIO 6 → Relay Sense']
+  },
+  adxl:{
+    title:'ADXL345 Accelerometer',
+    desc:'3-axis MEMS accelerometer. Measures walking footfall impacts using dynamic peak detection. Set to ±4G range. Connected on I2C at address 0x53.',
+    pins:['VCC → 3.3V','GND → GND','SDA → GPIO 4','SCL → GPIO 5']
+  },
+  oled:{
+    title:'SSD1306 0.91″ OLED Display',
+    desc:'128×32 pixel monochrome display. Shows walking stickman animation, step count, GPS data, motivational quotes, and the 20s progress bar.',
+    pins:['VCC → 3.3V','GND → GND','SDA → GPIO 4 (shared I2C)','SCL → GPIO 5 (shared I2C)']
+  },
+  relay:{
+    title:'5V Relay Module',
+    desc:'Active-LOW relay that physically cuts power to the TV. IN1 controlled by GPIO 2. Sense line on GPIO 6 detects if the relay is physically plugged in.',
+    pins:['VCC → 5V VBUS','GND → GND','IN1 → GPIO 2 (Active-LOW)','Sense → GPIO 6 (INPUT_PULLUP)']
+  },
+  gps:{
+    title:'NEO-6M GPS Module',
+    desc:'Satellite GPS receiver streaming standard NMEA sentences over UART at 9600 baud. Tracks real-world walking distance and speed. First fix takes 30–90s outdoors.',
+    pins:['VCC → 3.3V','GND → GND','TX → GPIO 0 (UART1 RX)','RX → GPIO 1 (UART1 TX)']
+  }
+};
+
+function selectComp(id){
+  const d = compData[id];
+  const panel = document.getElementById('compInfo');
+  document.getElementById('compTitle').textContent = d.title;
+  document.getElementById('compDesc').textContent = d.desc;
+  const pinsEl = document.getElementById('compPins');
+  pinsEl.innerHTML = d.pins.map(p=>`<span class="pin-tag">${p}</span>`).join('');
+  panel.classList.add('visible');
+
+  // Highlight selected component, dim others
+  document.querySelectorAll('.comp rect:first-child').forEach(r=>r.style.opacity='0.35');
+  const sel = document.querySelector('#comp-'+id+' rect:first-child');
+  if(sel) sel.style.opacity='1';
+}
+
+// ══════════════════════════════
+// SIMULATOR LOGIC
+// ══════════════════════════════
+const oledCanvas = document.getElementById('simOLED');
+const ctx = oledCanvas.getContext('2d');
+
+// State
+let stepCount = 0, accMs = 0, relayConnected = false, gpsFixed = false;
+let gpsSpeed = 0, gpsDist = 0, relayOn = false, isWalking = false;
+let animFrame = 0, quoteIdx = 0, lastMotion = 0, showGPSScreen = false;
+let walkInterval = null, accTick = null, lastTick = 0;
+let screenToggle = null;
+
+const quotes = ["Walk On!","Step Up!","Keep Going!","Stay Active","Nice Pace!",
+  "Good Job!","Move It!","Burn Fat!","Stay Fit!","On Fire!","Great Job!","Never Stop!"];
+
+// OLED drawing helpers
+function oClr()      { ctx.fillStyle='#000'; ctx.fillRect(0,0,128,32); }
+function oLine(x0,y0,x1,y1){ ctx.strokeStyle='#00ff77'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(x0+.5,y0+.5); ctx.lineTo(x1+.5,y1+.5); ctx.stroke(); }
+function oCircle(cx,cy,r){ ctx.strokeStyle='#00ff77'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.arc(cx+.5,cy+.5,r,0,Math.PI*2); ctx.stroke(); }
+function oText(x,y,t,sz){ ctx.fillStyle='#00ff77';
+  ctx.font=(sz===2?'bold 11px':'bold 6px')+' monospace'; ctx.fillText(t,x,y+(sz===2?11:7)); }
+function oDot(x,y,r){ ctx.fillStyle='#00ff77'; ctx.beginPath();
+  ctx.arc(x+.5,y+.5,r,0,Math.PI*2); ctx.fill(); }
+function oHLine(x,y,w){ ctx.fillStyle='#00ff77'; ctx.fillRect(x,y,w,1); }
+
+function drawMan(x,y,fr,walking){
+  const hy=y-18, sy=hy+4, hy2=y-7;
+  const yo=walking&&(fr===1||fr===3)?-1:0;
+  const ry=y+yo, rhy=ry-18, rsy=rhy+4, rhy2=ry-7;
+  oCircle(x,rhy,3);
+  oLine(x,rhy+3,x,rhy2);
+  if(!walking){ oLine(x,rsy,x-4,rsy+6); oLine(x,rsy,x+4,rsy+6);
+    oLine(x,rhy2,x-3,ry); oLine(x,rhy2,x+3,ry); }
+  else {
+    let aL,aR,lL,lR;
+    if(fr===0){lL=x+4;lR=x-4;aL=x-4;aR=x+4;}
+    else if(fr===1){lL=x+1;lR=x-1;aL=x-1;aR=x+1;}
+    else if(fr===2){lL=x-4;lR=x+4;aL=x+4;aR=x-4;}
+    else{lL=x-1;lR=x+1;aL=x+1;aR=x-1;}
+    oLine(x,rsy,aL,rsy+5); oLine(x,rsy,aR,rsy+5);
+    oLine(x,rhy2,lL,ry);   oLine(x,rhy2,lR,ry);
+  }
+}
+
+function drawStepCount(cnt){
+  let sx=76;
+  if(cnt<10)sx=94; else if(cnt<100)sx=86; else if(cnt<1000)sx=74; else sx=62;
+  oText(sx,8,String(cnt),2);
+}
+
+function renderOLED(){
+  oClr();
+  const walking = (Date.now()-lastMotion<2000);
+  const speech = !relayConnected?'Plug in Relay!':
+    stepCount===0&&accMs===0?'Walk 2 get steps!':
+    walking?quotes[quoteIdx]:'Relay Connected!';
+
+  if(showGPSScreen && gpsFixed){
+    oText(2,0,speech,1);
+    drawMan(14,30,animFrame,walking);
+    const d=gpsDist<1000?Math.round(gpsDist)+'m':(gpsDist/1000).toFixed(2)+'km';
+    oText(58,8,d,1);
+    oText(58,20,gpsSpeed.toFixed(1)+'km/h',1);
+    oDot(126,2,2);
+  } else {
+    oText(2,0,speech,1);
+    drawMan(14,30,animFrame,walking);
+    drawStepCount(stepCount);
+  }
+  // Progress bar
+  const bw=Math.round((accMs%1000)/1000*97);
+  if(bw>0) oHLine(30,31,Math.min(bw,97));
+}
+
+// Update all UI
+function updateUI(){
+  // Relay output
+  const shouldRelayOn = relayConnected && stepCount > 0;
+  relayOn = shouldRelayOn;
+  const rLED = document.getElementById('relayLED');
+  const rState = document.getElementById('relayState');
+  if(relayOn){ rLED.className='led on-green'; rState.textContent='LOW (ON)'; rState.style.color='#22c55e'; }
+  else { rLED.className='led'; rState.textContent='HIGH (OFF)'; rState.style.color='var(--muted)'; }
+  // SVG relay LED
+  const svgLed = document.getElementById('relayLedSVG');
+  if(svgLed) svgLed.setAttribute('fill', relayOn?'#22c55e':'#1a1200');
+
+  // Sense LED
+  const sLED = document.getElementById('senseLED');
+  sLED.className = relayConnected?'led on-green':'led';
+  // GPS LED
+  const gLED = document.getElementById('gpsLED');
+  gLED.className = gpsFixed?'led on-blue':'led';
+
+  // Stats
+  document.getElementById('sSteps').textContent = stepCount;
+  document.getElementById('sDist').textContent = gpsDist<1000?Math.round(gpsDist)+'m':(gpsDist/1000).toFixed(2)+'km';
+  document.getElementById('sSpeed').textContent = gpsSpeed.toFixed(1);
+  document.getElementById('gpsDistLbl').textContent = gpsDist<1000?Math.round(gpsDist)+'m':(gpsDist/1000).toFixed(2)+'km';
+  document.getElementById('gpsSpeedLbl').textContent = gpsSpeed.toFixed(1)+' km/h';
+  document.getElementById('gpsFixLbl').textContent = gpsFixed?'FIXED':'NO FIX';
+  document.getElementById('gpsFixLbl').style.color = gpsFixed?'var(--green)':'var(--red)';
+  document.getElementById('gpsSats').textContent = gpsFixed?Math.floor(6+Math.random()*3):'0';
+  // Memory panel
+  if(document.getElementById('memSteps')){
+    document.getElementById('memSteps').textContent = stepCount;
+    document.getElementById('memAcc').textContent = Math.round(accMs/1000)+'s';
+  }
+}
+
+// Main 50Hz loop
+setInterval(()=>{
+  const now = Date.now();
+  const walking = (now - lastMotion < 2000);
+
+  // Accumulator engine
+  if(walking){
+    const gpsOK = !gpsFixed || gpsSpeed >= 0.5;
+    if(gpsOK){
+      if(lastTick>0) accMs += (now-lastTick);
+      lastTick = now;
+      // GPS distance sim
+      if(gpsFixed && gpsSpeed>0.5){
+        gpsDist += gpsSpeed/3600*0.02; // 20ms worth of distance
+      }
+    } else { lastTick=0; }
+  } else { lastTick=0; }
+
+  // Step award (1 second walked = 1 TV second)
+  while(accMs >= 1000){
+    accMs -= 1000;
+    stepCount++;
+    serialLog(`>> STEP EARNED! 1s walked. Total TV Seconds: ${stepCount}`,'s-step');
+    updateMemPulse();
+  }
+
+  // TV countdown
+  if(relayConnected && stepCount>0){
+    if(!relayOn) serialLog('>> [RELAY OUTPUT] ON (GPIO 2 LOW) - TV Powered!','s-relay');
+  }
+
+  // Animation
+  animFrame = Math.floor(now/140)%4;
+  quoteIdx = Math.floor(now/2500)%quotes.length;
+
+  // Progress bar
+  const pct = Math.min((accMs%1000)/10,100);
+  document.getElementById('accBar').style.width=pct+'%';
+  const msRem = Math.floor(accMs%1000);
+  document.getElementById('accLabel').textContent=msRem+'ms / 1000ms';
+
+  renderOLED();
+  updateUI();
+},20);
+
+// GPS distance when relay on countdown
+setInterval(()=>{
+  if(relayConnected && stepCount>0){
+    stepCount--;
+    serialLog(`>> TV COUNTDOWN: ${stepCount}s remaining.`,'s-count');
+    updateMemPulse();
+  }
+  if(relayConnected && stepCount<0) stepCount=0;
+  // Toggle GPS screen
+  showGPSScreen = !showGPSScreen;
+},1000);
+
+function startWalk(){
+  lastMotion = Date.now();
+  serialLog('>> FOOTFALL DETECTED! Walking...','s-step');
+}
+function burst10(){
+  accMs += 10000; // 10,000ms = 10 steps
+  lastMotion = Date.now();
+  serialLog('>> BURST! +10s accumulated (10 steps earned)','s-step');
+}
+function resetDevice(){
+  serialLog('[MEMORY] Restored stepCount = '+stepCount+' | Walking accumulator = '+Math.round(accMs/1000)+'s','s-sys');
+}
+function toggleRelay(on){
+  relayConnected = on;
+  if(on) serialLog('>> [HARDWARE SENSE] Relay Connected! (GPIO 6 LOW)','s-relay');
+  else serialLog('>> [HARDWARE SENSE] Relay Unplugged! (GPIO 6 HIGH) - Countdown Frozen.','s-relay');
+}
+function toggleGPS(on){
+  gpsFixed = on;
+  if(on) serialLog('[GPS] Satellite fix acquired! Tracking enabled.','s-gps');
+  else serialLog('[GPS] Fix lost — falling back to ADXL345-only.','s-gps');
+}
+function updateGPSSpeed(v){
+  gpsSpeed = parseFloat(v);
+  document.getElementById('gpsSpeedVal').textContent=parseFloat(v).toFixed(1)+' km/h';
+}
+
+// Keyboard: hold SPACE to walk
+document.addEventListener('keydown',e=>{if(e.code==='Space'&&!e.repeat){e.preventDefault();startWalk();}});
+document.addEventListener('keyup',e=>{if(e.code==='Space'){lastMotion=0;}});
+
+// Walk button hold
+let walkHold=null;
+const wb=document.getElementById('btnWalk');
+if(wb){
+  wb.addEventListener('mousedown',()=>{walkHold=setInterval(startWalk,400);startWalk();});
+  wb.addEventListener('mouseup',()=>{clearInterval(walkHold);});
+  wb.addEventListener('touchstart',e=>{e.preventDefault();walkHold=setInterval(startWalk,400);startWalk();});
+  wb.addEventListener('touchend',()=>{clearInterval(walkHold);});
+}
+
+// SERIAL LOG
+function serialLog(msg,cls){
+  const box = document.getElementById('serialBox');
+  if(!box) return;
+  const p = document.createElement('p');
+  p.className=cls||'';
+  p.textContent=msg;
+  box.appendChild(p);
+  box.scrollTop=box.scrollHeight;
+  // Keep max 100 lines
+  while(box.children.length>100) box.removeChild(box.firstChild);
+}
+function clearSerial(){ const b=document.getElementById('serialBox'); if(b)b.innerHTML=''; }
+
+function updateMemPulse(){
+  ['memSteps','memAcc'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){ el.classList.remove('mem-pulse'); void el.offsetWidth; el.classList.add('mem-pulse'); }
+  });
+}
+
+// Boot logs
+setTimeout(()=>{
+  serialLog('==================================================','s-sys');
+  serialLog('  ESP32-C3 PEDOMETER & RELAY CONTROL STARTING','s-sys');
+  serialLog('==================================================','s-sys');
+  serialLog('[SUCCESS] Relay Control Pin initialized on GPIO 2','s-sys');
+  serialLog('[SUCCESS] Relay Sense Pin initialized on GPIO 6','s-sys');
+  serialLog('[SUCCESS] 0.91" OLED Display initialized at 0x3C','s-sys');
+  serialLog('[SUCCESS] ADXL345 Sensor Connected at 0x53','s-sys');
+  serialLog('[GPS] NEO-6M GPS initialized on GPIO 0/1 @ 9600 baud','s-gps');
+  serialLog('[GPS] Waiting for satellite fix...','s-gps');
+  serialLog('[MEMORY] Restored stepCount = 0 | walkAcc = 0s','s-sys');
+  serialLog('TIP: Hold the "Walk" button or press SPACE to walk!','s-acc');
+},300);
+
+// Initial OLED render
+renderOLED();
+</script>
+</body>
+</html>

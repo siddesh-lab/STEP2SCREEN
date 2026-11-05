@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>ESP32-C3 Smart Pedometer â€” Master Visual Archive (50 Figures)</title>
+<style>
+:root {
+  --green: #00ff77;
+  --blue:  #3b82f6;
+  --purple:#8b5cf6;
+  --yellow:#f59e0b;
+  --red:   #ef4444;
+  --cyan:  #06b6d4;
+  --bg:    #070b12;
+  --card:  #0e1524;
+  --card2: #141f33;
+  --border:#1b2844;
+  --text:  #e2e8f0;
+  --muted: #5e6f8a;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  line-height: 1.6;
+}
+header {
+  padding: 48px 24px 32px;
+  text-align: center;
+  background: radial-gradient(ellipse at 50% 0%, #00ff7715 0%, transparent 60%);
+  border-bottom: 1px solid var(--border);
+}
+.badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: #00ff7712; border: 1px solid #00ff7733;
+  color: var(--green); border-radius: 999px;
+  padding: 6px 18px; font-size: 12px; font-weight: 700;
+  letter-spacing: 1px; margin-bottom: 16px;
+}
+h1 {
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  font-weight: 900; letter-spacing: -1.5px;
+  background: linear-gradient(135deg, #fff 40%, var(--green));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; margin-bottom: 12px;
+}
+header p {
+  color: var(--muted); font-size: 1.05rem; max-width: 680px; margin: 0 auto 24px;
+}
+.nav-links {
+  display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 8px;
+}
+.nav-btn {
+  background: var(--card2); border: 1px solid var(--border);
+  color: var(--text); padding: 8px 18px; border-radius: 10px;
+  font-size: 13px; font-weight: 600; text-decoration: none;
+  transition: .2s; cursor: pointer;
+}
+.nav-btn:hover { border-color: var(--green); color: var(--green); }
+.nav-btn.primary {
+  background: #00ff7718; border-color: #00ff7755; color: var(--green);
+}
+
+/* FILTER PILLS */
+.filters {
+  display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin: 28px 0 10px;
+}
+.filter-pill {
+  padding: 6px 16px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  background: var(--card); border: 1px solid var(--border); color: var(--muted);
+  cursor: pointer; transition: .2s;
+}
+.filter-pill:hover, .filter-pill.active {
+  background: var(--card2); border-color: var(--green); color: var(--green);
+}
+
+/* CONTAINER */
+.container {
+  max-width: 1360px; margin: 0 auto; padding: 40px 24px 80px;
+}
+
+/* GALLERY GRID */
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 22px;
+}
+@media(max-width: 440px) {
+  .gallery-grid { grid-template-columns: 1fr; }
+}
+
+.gallery-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  overflow: hidden;
+  transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease;
+  display: flex; flex-direction: column;
+}
+.gallery-card:hover {
+  transform: translateY(-4px);
+  border-color: #00ff7744;
+  box-shadow: 0 12px 35px #00000080, 0 0 20px #00ff770a;
+}
+.img-wrap {
+  position: relative; width: 100%; height: 210px;
+  background: #04070e; overflow: hidden; cursor: pointer;
+}
+.img-wrap img {
+  width: 100%; height: 100%; object-fit: cover;
+  transition: transform .4s ease;
+}
+.gallery-card:hover .img-wrap img {
+  transform: scale(1.04);
+}
+.img-overlay {
+  position: absolute; inset: 0; background: linear-gradient(to top, #0e1524ee 0%, transparent 40%);
+  display: flex; align-items: flex-end; padding: 12px; opacity: 0.95;
+}
+.img-tag {
+  display: inline-block; padding: 4px 10px; border-radius: 6px;
+  font-size: 11px; font-weight: 800; letter-spacing: .5px;
+  text-transform: uppercase;
+}
+.tag-hw   { background: #3b82f622; color: #60a5fa; border: 1px solid #3b82f644; }
+.tag-step { background: #00ff7722; color: #4ade80; border: 1px solid #00ff7744; }
+.tag-gps  { background: #06b6d422; color: #22d3ee; border: 1px solid #06b6d444; }
+.tag-ui   { background: #8b5cf622; color: #a78bfa; border: 1px solid #8b5cf644; }
+.tag-relay{ background: #f59e0b22; color: #fbbf24; border: 1px solid #f59e0b44; }
+.tag-mem  { background: #ec489922; color: #f472b6; border: 1px solid #ec489944; }
+.tag-fair { background: #10b98122; color: #34d399; border: 1px solid #10b98144; }
+
+.card-content {
+  padding: 16px 18px 18px; flex: 1; display: flex; flex-direction: column;
+}
+.card-num {
+  font-size: 11px; font-weight: 800; color: var(--green);
+  letter-spacing: 1px; margin-bottom: 4px; font-family: monospace;
+}
+.card-content h3 {
+  font-size: 1.05rem; font-weight: 800; margin-bottom: 8px; line-height: 1.35;
+}
+.card-content p {
+  color: var(--muted); font-size: 12.5px; line-height: 1.6; margin-bottom: 14px; flex: 1;
+}
+.card-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-top: 10px; border-top: 1px solid var(--border); font-size: 12px;
+}
+.card-meta {
+  color: var(--muted); font-family: monospace; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px;
+}
+.view-btn {
+  background: none; border: none; color: var(--green);
+  font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 12px;
+}
+.view-btn:hover { text-decoration: underline; }
+
+/* LIGHTBOX MODAL */
+.modal {
+  display: none; position: fixed; inset: 0; z-index: 1000;
+  background: rgba(3, 6, 12, 0.94); backdrop-filter: blur(12px);
+  padding: 24px; align-items: center; justify-content: center;
+}
+.modal.active { display: flex; }
+.modal-box {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 20px; max-width: 1000px; width: 100%;
+  max-height: 92vh; overflow-y: auto; padding: 24px;
+  position: relative; box-shadow: 0 25px 60px rgba(0,0,0,0.8);
+}
+.modal-close {
+  position: absolute; top: 16px; right: 18px;
+  background: var(--card2); border: 1px solid var(--border);
+  color: var(--text); font-size: 20px; width: 36px; height: 36px;
+  border-radius: 50%; cursor: pointer; display: flex;
+  align-items: center; justify-content: center; transition: .2s;
+}
+.modal-close:hover { border-color: var(--red); color: var(--red); }
+.modal-img {
+  width: 100%; max-height: 560px; object-fit: contain;
+  border-radius: 12px; background: #03060c; margin-bottom: 18px;
+}
+.modal-title { font-size: 1.3rem; font-weight: 800; margin-bottom: 8px; }
+.modal-desc { color: var(--muted); font-size: 14px; line-height: 1.7; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="badge">ðŸ“¸ MASTER VISUAL ARCHIVE &middot; 50 FIGURES</div>
+  <h1>ESP32-C3 Smart Pedometer</h1>
+  <p>Complete 50-figure visual database documenting hardware prototypes, circuit schematics, pinout assignments, dynamic delta waveforms, NVS flash memory schemas, and exhibition presentations.</p>
+  <div class="nav-links">
+    <a href="index.html" class="nav-btn primary">&larr; Live Web Simulator</a>
+    <a href="game.html" class="nav-btn" style="border-color:#ffdd0066;color:#ffdd00;background:#ffdd0012;">🎮 Interactive Arcade Game</a>
+    <a href="presentation_kit/speech.html" class="nav-btn">&micro; Presenter Speech Script</a>
+    <a href="presentation_kit/information.html" class="nav-btn">&para; Technical Dossier</a>
+    <a href="PROJECT_GALLERY.md" class="nav-btn">Markdown Gallery</a>
+  </div>
+
+  <div class="filters">
+    <button class="filter-pill active" onclick="filterGallery('all', this)">All (50)</button>
+    <button class="filter-pill" onclick="filterGallery('hw', this)">Hardware &amp; Wiring (17)</button>
+    <button class="filter-pill" onclick="filterGallery('step', this)">Step Detection (8)</button>
+    <button class="filter-pill" onclick="filterGallery('gps', this)">GPS Tracking (6)</button>
+    <button class="filter-pill" onclick="filterGallery('ui', this)">OLED &amp; Animations (7)</button>
+    <button class="filter-pill" onclick="filterGallery('relay', this)">Relay &amp; TV Safety (6)</button>
+    <button class="filter-pill" onclick="filterGallery('mem', this)">NVS Flash Memory (3)</button>
+    <button class="filter-pill" onclick="filterGallery('fair', this)">Presentation &amp; Concepts (3)</button>
+  </div>
+</header>
+
+<main class="container">
+  <div class="gallery-grid" id="galleryGrid">
+    <div class="gallery-card" data-cat="hw">
+      <div class="img-wrap" onclick="showModal(0)">
+        <img src="images/hardware_prototype_overview_1793602478676.jpg" alt="01. Complete Hardware Prototype" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-hw">Overview</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 01</div>
+        <h3>01. Complete Hardware Prototype</h3>
+        <p>Complete breadboard prototype integrating ESP32-C3, ADXL345, OLED, 5V Relay, and NEO-6M GPS.</p>
+        <div class="card-footer">
+          <span class="card-meta">hardware_prototype_overview_1793602478676.jpg</span>
+          <button class="view-btn" onclick="showModal(0)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="step">
+      <div class="img-wrap" onclick="showModal(1)">
+        <img src="images/adxl345_step_detection_walking_1793602474657.jpg" alt="02. Walking & Step Detection Test" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-step">Sensor in Motion</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 02</div>
+        <h3>02. Walking & Step Detection Test</h3>
+        <p>Handheld field testing of the ADXL345 dynamic low-pass delta filter capturing real footstep impulses.</p>
+        <div class="card-footer">
+          <span class="card-meta">adxl345_step_detection_walking_1793602474657.jpg</span>
+          <button class="view-btn" onclick="showModal(1)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="gps">
+      <div class="img-wrap" onclick="showModal(2)">
+        <img src="images/neo6m_gps_outdoor_tracking_1793602481978.jpg" alt="03. GPS Outdoor Tracking & Distance" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-gps">Satellite Telemetry</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 03</div>
+        <h3>03. GPS Outdoor Tracking & Distance</h3>
+        <p>Satellite tracking on a running track validating real distance (0.85 km) and Doppler speed (4.2 km/h).</p>
+        <div class="card-footer">
+          <span class="card-meta">neo6m_gps_outdoor_tracking_1793602481978.jpg</span>
+          <button class="view-btn" onclick="showModal(2)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="ui">
+      <div class="img-wrap" onclick="showModal(3)">
+        <img src="images/oled_display_macro_1793602478614.jpg" alt="04. OLED Display & 20s Progress Bar" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-ui">OLED Macro</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 04</div>
+        <h3>04. OLED Display & 20s Progress Bar</h3>
+        <p>Miniature 0.91-inch 128x32 screen showing stickman animation, speech quotes, and accumulator bar.</p>
+        <div class="card-footer">
+          <span class="card-meta">oled_display_macro_1793602478614.jpg</span>
+          <button class="view-btn" onclick="showModal(3)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="relay">
+      <div class="img-wrap" onclick="showModal(4)">
+        <img src="images/relay_tv_power_control_png_1793602484986.jpg" alt="05. 5V Relay TV Power Control" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-relay">Power Enforcement</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 05</div>
+        <h3>05. 5V Relay TV Power Control</h3>
+        <p>Active-LOW relay switching television power while 1-second countdown decrements remaining steps.</p>
+        <div class="card-footer">
+          <span class="card-meta">relay_tv_power_control_png_1793602484986.jpg</span>
+          <button class="view-btn" onclick="showModal(4)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="fair">
+      <div class="img-wrap" onclick="showModal(5)">
+        <img src="images/science_fair_pedometer_booth_1793602519436.jpg" alt="06. School Science Fair Booth" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-fair">Exhibition Setup</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 06</div>
+        <h3>06. School Science Fair Booth</h3>
+        <p>Presentation booth display featuring trifold poster, breadboard prototype, and live laptop telemetry.</p>
+        <div class="card-footer">
+          <span class="card-meta">science_fair_pedometer_booth_1793602519436.jpg</span>
+          <button class="view-btn" onclick="showModal(5)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="hw">
+      <div class="img-wrap" onclick="showModal(6)">
+        <img src="images/esp32_c3_pin_wiring_macro_1793602843143.jpg" alt="07. ESP32-C3 Board & Wiring Macro" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-hw">Controller Macro</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 07</div>
+        <h3>07. ESP32-C3 Board & Wiring Macro</h3>
+        <p>Macro shot of the 32-bit RISC-V development board, RF shield, USB-C, and color-coded DuPont routing.</p>
+        <div class="card-footer">
+          <span class="card-meta">esp32_c3_pin_wiring_macro_1793602843143.jpg</span>
+          <button class="view-btn" onclick="showModal(6)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="fair">
+      <div class="img-wrap" onclick="showModal(7)">
+        <img src="images/wearable_pedometer_wristband_prototype_1793602840123.jpg" alt="08. 3D-Printed Wearable Watch" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-fair">Industrial Design</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 08</div>
+        <h3>08. 3D-Printed Wearable Watch</h3>
+        <p>Product evolution concept showing the circuit miniaturized inside a custom 3D-printed sports wristband.</p>
+        <div class="card-footer">
+          <span class="card-meta">wearable_pedometer_wristband_prototype_1793602840123.jpg</span>
+          <button class="view-btn" onclick="showModal(7)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="step">
+      <div class="img-wrap" onclick="showModal(8)">
+        <img src="images/adxl345_sensor_calibration_multimeter_testing_1793602840082.jpg" alt="09. ADXL345 Calibration Testing" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-step">Lab Diagnostics</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 09</div>
+        <h3>09. ADXL345 Calibration Testing</h3>
+        <p>Laboratory measurement verifying clean 3.3V power rails and oscilloscope tracing of 100 kHz I2C signals.</p>
+        <div class="card-footer">
+          <span class="card-meta">adxl345_sensor_calibration_multimeter_testing_1793602840082.jpg</span>
+          <button class="view-btn" onclick="showModal(8)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="gps">
+      <div class="img-wrap" onclick="showModal(9)">
+        <img src="images/neo6m_gps_antenna_macro_1793602846170.jpg" alt="10. NEO-6M GPS Ceramic Antenna Macro" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-gps">GPS Receiver</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 10</div>
+        <h3>10. NEO-6M GPS Ceramic Antenna Macro</h3>
+        <p>Close-up of the 25x25mm patch antenna, U-blox receiver silicon, backup battery, and 1PPS lock LED.</p>
+        <div class="card-footer">
+          <span class="card-meta">neo6m_gps_antenna_macro_1793602846170.jpg</span>
+          <button class="view-btn" onclick="showModal(9)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="relay">
+      <div class="img-wrap" onclick="showModal(10)">
+        <img src="images/tv_power_cut_off_event_1793602878212.jpg" alt="11. TV Power Cut-Off Event" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-relay">Cut-Off Event</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 11</div>
+        <h3>11. TV Power Cut-Off Event</h3>
+        <p>Step count reaches 0: relay de-energizes, OLED prompts Walk 2 get steps!, and the television cuts off.</p>
+        <div class="card-footer">
+          <span class="card-meta">tv_power_cut_off_event_1793602878212.jpg</span>
+          <button class="view-btn" onclick="showModal(10)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="mem">
+      <div class="img-wrap" onclick="showModal(11)">
+        <img src="images/esp32_nvs_persistence_powerup_1793602889237.jpg" alt="12. NVS Flash Memory Retention" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-mem">Flash Memory</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 12</div>
+        <h3>12. NVS Flash Memory Retention</h3>
+        <p>Reconnecting USB power proves non-volatile step storage: loads 'Steps saved: 1250' from flash.</p>
+        <div class="card-footer">
+          <span class="card-meta">esp32_nvs_persistence_powerup_1793602889237.jpg</span>
+          <button class="view-btn" onclick="showModal(11)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="fair">
+      <div class="img-wrap" onclick="showModal(12)">
+        <img src="images/student_breadboard_assembly_1793602893427.jpg" alt="13. Student Breadboard Assembly" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-fair">STEM Workshop</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 13</div>
+        <h3>13. Student Breadboard Assembly</h3>
+        <p>Hands-on construction showing wiring tweezers, wire strippers, digital calipers, and printed pinouts.</p>
+        <div class="card-footer">
+          <span class="card-meta">student_breadboard_assembly_1793602893427.jpg</span>
+          <button class="view-btn" onclick="showModal(12)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="hw">
+      <div class="img-wrap" onclick="showModal(13)">
+        <img src="images/smart_pedometer_prototype_1793531618535.jpg" alt="14. Maker Workbench Prototype" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-hw">Initial Build</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 14</div>
+        <h3>14. Maker Workbench Prototype</h3>
+        <p>Initial working prototype running on a wooden workshop desk validating display and relay triggering.</p>
+        <div class="card-footer">
+          <span class="card-meta">smart_pedometer_prototype_1793531618535.jpg</span>
+          <button class="view-btn" onclick="showModal(13)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="hw">
+      <div class="img-wrap" onclick="showModal(14)">
+        <img src="images/fig15_system_architecture_block.svg" alt="15. High-Level Architecture Block" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-hw">Architecture</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 15</div>
+        <h3>15. High-Level Architecture Block</h3>
+        <p>Complete system block diagram connecting sensors, microcontroller, display, and power rails.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig15_system_architecture_block.svg</span>
+          <button class="view-btn" onclick="showModal(14)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="hw">
+      <div class="img-wrap" onclick="showModal(15)">
+        <img src="images/fig16_color_schematic_wiring.svg" alt="16. Color-Coded Schematic Wiring" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-hw">Schematics</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 16</div>
+        <h3>16. Color-Coded Schematic Wiring</h3>
+        <p>Comprehensive wiring diagram with wire colors matching CIRCUIT_DIAGRAM.md specifications.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig16_color_schematic_wiring.svg</span>
+          <button class="view-btn" onclick="showModal(15)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="hw">
+      <div class="img-wrap" onclick="showModal(16)">
+        <img src="images/fig17_esp32c3_pinout_map.svg" alt="17. ESP32-C3 Dedicated Pinout Map" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-hw">Pinout</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 17</div>
+        <h3>17. ESP32-C3 Dedicated Pinout Map</h3>
+        <p>Pin routing map for GPIO 0, 1, 2, 4, 5, 6, 3V3, GND, and 5V VBUS.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig17_esp32c3_pinout_map.svg</span>
+          <button class="view-btn" onclick="showModal(16)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="step">
+      <div class="img-wrap" onclick="showModal(17)">
+        <img src="images/fig18_adxl345_architecture.svg" alt="18. ADXL345 Register & Pin Architecture" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-step">Accelerometer</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 18</div>
+        <h3>18. ADXL345 Register & Pin Architecture</h3>
+        <p>Internal register map (DATAX0-Z1), I2C address 0x53, and +/-4g dynamic range settings.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig18_adxl345_architecture.svg</span>
+          <button class="view-btn" onclick="showModal(17)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="ui">
+      <div class="img-wrap" onclick="showModal(18)">
+        <img src="images/fig19_ssd1306_oled_geometry.svg" alt="19. SSD1306 OLED (128x32) Pixel Geometry" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-ui">Display Map</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 19</div>
+        <h3>19. SSD1306 OLED (128x32) Pixel Geometry</h3>
+        <p>Screen zone partitioning: Speech text row, Stickman animation box, and numerical step readout.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig19_ssd1306_oled_geometry.svg</span>
+          <button class="view-btn" onclick="showModal(18)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="relay">
+      <div class="img-wrap" onclick="showModal(19)">
+        <img src="images/fig20_relay_module_circuit.svg" alt="20. 5V Relay Switching & Isolation Circuit" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-relay">Relay Circuit</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 20</div>
+        <h3>20. 5V Relay Switching & Isolation Circuit</h3>
+        <p>Optocoupler isolation and COM/NO output terminals safely driving the television load.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig20_relay_module_circuit.svg</span>
+          <button class="view-btn" onclick="showModal(19)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="gps">
+      <div class="img-wrap" onclick="showModal(20)">
+        <img src="images/fig21_neo6m_gps_architecture.svg" alt="21. NEO-6M GPS Architecture & Patch" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-gps">GPS Module</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 21</div>
+        <h3>21. NEO-6M GPS Architecture & Patch</h3>
+        <p>UART serial streaming pinout, 25x25mm ceramic patch antenna, and 1PPS lock indicator.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig21_neo6m_gps_architecture.svg</span>
+          <button class="view-btn" onclick="showModal(20)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="hw">
+      <div class="img-wrap" onclick="showModal(21)">
+        <img src="images/fig22_i2c_bus_timing_protocol.svg" alt="22. Shared I2C Bus Timing & Topology" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-hw">I2C Protocol</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 22</div>
+        <h3>22. Shared I2C Bus Timing & Topology</h3>
+        <p>Master-slave shared bus architecture on GPIO 4 (SDA) and GPIO 5 (SCL) at 100 kHz.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig22_i2c_bus_timing_protocol.svg</span>
+          <button class="view-btn" onclick="showModal(21)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="gps">
+      <div class="img-wrap" onclick="showModal(22)">
+        <img src="images/fig23_uart_serial_gps_stream.svg" alt="23. UART1 Asynchronous NMEA Stream" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-gps">UART Serial</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 23</div>
+        <h3>23. UART1 Asynchronous NMEA Stream</h3>
+        <p>Dedicated serial stream from NEO-6M to ESP32-C3 GPIO 0 RX at 9600 baud.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig23_uart_serial_gps_stream.svg</span>
+          <button class="view-btn" onclick="showModal(22)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="step">
+      <div class="img-wrap" onclick="showModal(23)">
+        <img src="images/fig24_accelerometer_waveform_filter.svg" alt="24. Dynamic Delta Waveform Filter" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-step">Signal Waveform</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 24</div>
+        <h3>24. Dynamic Delta Waveform Filter</h3>
+        <p>Waveform comparison: rejection of low-impact arm shaking vs acceptance of true footfalls.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig24_accelerometer_waveform_filter.svg</span>
+          <button class="view-btn" onclick="showModal(23)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="hw">
+      <div class="img-wrap" onclick="showModal(24)">
+        <img src="images/fig25_finite_state_machine.svg" alt="25. Finite State Machine Transitions" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-hw">State Machine</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 25</div>
+        <h3>25. Finite State Machine Transitions</h3>
+        <p>Deterministic 5-state firmware loop governing boot, walking, TV power, and zero cut-off.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig25_finite_state_machine.svg</span>
+          <button class="view-btn" onclick="showModal(24)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="step">
+      <div class="img-wrap" onclick="showModal(25)">
+        <img src="images/fig26_20s_accumulator_flowchart.svg" alt="26. 20-Second Accumulator Algorithm" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-step">Speed Limit</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 26</div>
+        <h3>26. 20-Second Accumulator Algorithm</h3>
+        <p>Time accumulation engine requiring 20 continuous seconds of walking to earn 1 TV second.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig26_20s_accumulator_flowchart.svg</span>
+          <button class="view-btn" onclick="showModal(25)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="gps">
+      <div class="img-wrap" onclick="showModal(26)">
+        <img src="images/fig27_gps_velocity_gating.svg" alt="27. GPS Doppler Velocity Validation Gate" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-gps">Anti-Cheat</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 27</div>
+        <h3>27. GPS Doppler Velocity Validation Gate</h3>
+        <p>Speed-gated step increment logic requiring velocity >= 0.5 km/h when satellites are locked.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig27_gps_velocity_gating.svg</span>
+          <button class="view-btn" onclick="showModal(26)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="mem">
+      <div class="img-wrap" onclick="showModal(27)">
+        <img src="images/fig28_nvs_flash_memory_schema.svg" alt="28. ESP32 NVS Flash Partition Schema" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-mem">Flash Memory</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 28</div>
+        <h3>28. ESP32 NVS Flash Partition Schema</h3>
+        <p>Storage architecture for 'steps' and 'walkAcc' keys with native flash wear-leveling.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig28_nvs_flash_memory_schema.svg</span>
+          <button class="view-btn" onclick="showModal(27)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="relay">
+      <div class="img-wrap" onclick="showModal(28)">
+        <img src="images/fig29_relay_active_low_logic.svg" alt="29. Relay Active-LOW Optocoupler Circuit" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-relay">Relay Logic</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 29</div>
+        <h3>29. Relay Active-LOW Optocoupler Circuit</h3>
+        <p>Low-side drive logic: GPIO 2 LOW turns on relay coil; GPIO 2 HIGH de-energizes coil.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig29_relay_active_low_logic.svg</span>
+          <button class="view-btn" onclick="showModal(28)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="relay">
+      <div class="img-wrap" onclick="showModal(29)">
+        <img src="images/fig30_gpio6_sense_circuit.svg" alt="30. GPIO 6 Hardware Sense Circuit" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-relay">Anti-Tamper</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 30</div>
+        <h3>30. GPIO 6 Hardware Sense Circuit</h3>
+        <p>Pull-up loop detecting physical relay disconnection to immediately freeze step balances.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig30_gpio6_sense_circuit.svg</span>
+          <button class="view-btn" onclick="showModal(29)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="ui">
+      <div class="img-wrap" onclick="showModal(30)">
+        <img src="images/fig31_stickman_frame_0.svg" alt="31. OLED Stickman Frame 0 (Stride Left)" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-ui">Animation</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 31</div>
+        <h3>31. OLED Stickman Frame 0 (Stride Left)</h3>
+        <p>First keyframe in 140ms animation loop showing left arm/leg forward stance.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig31_stickman_frame_0.svg</span>
+          <button class="view-btn" onclick="showModal(30)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="ui">
+      <div class="img-wrap" onclick="showModal(31)">
+        <img src="images/fig32_stickman_frame_1.svg" alt="32. OLED Stickman Frame 1 (Mid-Step Bob)" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-ui">Animation</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 32</div>
+        <h3>32. OLED Stickman Frame 1 (Mid-Step Bob)</h3>
+        <p>Vertical bob elevation (-1px offset) simulating natural center-of-mass elevation.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig32_stickman_frame_1.svg</span>
+          <button class="view-btn" onclick="showModal(31)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="ui">
+      <div class="img-wrap" onclick="showModal(32)">
+        <img src="images/fig33_stickman_frame_2.svg" alt="33. OLED Stickman Frame 2 (Stride Right)" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-ui">Animation</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 33</div>
+        <h3>33. OLED Stickman Frame 2 (Stride Right)</h3>
+        <p>Opposite limb stride completing symmetrical bilateral locomotion cycle.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig33_stickman_frame_2.svg</span>
+          <button class="view-btn" onclick="showModal(32)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="ui">
+      <div class="img-wrap" onclick="showModal(33)">
+        <img src="images/fig34_stickman_frame_3.svg" alt="34. OLED Stickman Frame 3 (Return Stance)" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-ui">Animation</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 34</div>
+        <h3>34. OLED Stickman Frame 3 (Return Stance)</h3>
+        <p>Recovery keyframe transitioning back into Frame 0 continuous loop.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig34_stickman_frame_3.svg</span>
+          <button class="view-btn" onclick="showModal(33)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="ui">
+      <div class="img-wrap" onclick="showModal(34)">
+        <img src="images/fig35_oled_layout_a_steps.svg" alt="35. OLED Layout A (Pedometer Mode)" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-ui">Screen Map</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 35</div>
+        <h3>35. OLED Layout A (Pedometer Mode)</h3>
+        <p>Step counter screen layout with animated stickman, motivational quote, and progress bar.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig35_oled_layout_a_steps.svg</span>
+          <button class="view-btn" onclick="showModal(34)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="ui">
+      <div class="img-wrap" onclick="showModal(35)">
+        <img src="images/fig36_oled_layout_b_gps.svg" alt="36. OLED Layout B (GPS Distance Mode)" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-ui">Screen Map</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 36</div>
+        <h3>36. OLED Layout B (GPS Distance Mode)</h3>
+        <p>GPS mode screen layout alternating every 3 seconds to show kilometers and speed.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig36_oled_layout_b_gps.svg</span>
+          <button class="view-btn" onclick="showModal(35)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="hw">
+      <div class="img-wrap" onclick="showModal(36)">
+        <img src="images/fig37_power_distribution_tree.svg" alt="37. Power Distribution Tree" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-hw">Power Rail</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 37</div>
+        <h3>37. Power Distribution Tree</h3>
+        <p>5V USB-C VBUS power rail partitioning and 3.3V LDO regulator subsystem.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig37_power_distribution_tree.svg</span>
+          <button class="view-btn" onclick="showModal(36)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="hw">
+      <div class="img-wrap" onclick="showModal(37)">
+        <img src="images/fig38_current_consumption_chart.svg" alt="38. Current Consumption Breakdown" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-hw">Energy Load</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 38</div>
+        <h3>38. Current Consumption Breakdown</h3>
+        <p>Module-by-module load analysis showing ~85mA operating draw for 11+ hours on 1000mAh.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig38_current_consumption_chart.svg</span>
+          <button class="view-btn" onclick="showModal(37)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="step">
+      <div class="img-wrap" onclick="showModal(38)">
+        <img src="images/fig39_cadence_debounce_timing.svg" alt="39. Cadence Debounce Timing Diagram" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-step">Debounce Window</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 39</div>
+        <h3>39. Cadence Debounce Timing Diagram</h3>
+        <p>400ms refractory timing window eliminating mechanical contact bounce and arm tremor.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig39_cadence_debounce_timing.svg</span>
+          <button class="view-btn" onclick="showModal(38)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="mem">
+      <div class="img-wrap" onclick="showModal(39)">
+        <img src="images/fig40_boot_sequence_memory_flow.svg" alt="40. Boot Sequence & Memory Recovery Flow" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-mem">Boot Sequence</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 40</div>
+        <h3>40. Boot Sequence & Memory Recovery Flow</h3>
+        <p>Cold-boot initialization timeline restoring user step balance from flash storage.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig40_boot_sequence_memory_flow.svg</span>
+          <button class="view-btn" onclick="showModal(39)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="relay">
+      <div class="img-wrap" onclick="showModal(40)">
+        <img src="images/fig41_relay_disconnect_freeze.svg" alt="41. Relay Disconnect Anti-Tamper Sequence" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-relay">Safety Logic</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 41</div>
+        <h3>41. Relay Disconnect Anti-Tamper Sequence</h3>
+        <p>Real-time pull-up sensing halting countdown decrements if relay jumper is pulled.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig41_relay_disconnect_freeze.svg</span>
+          <button class="view-btn" onclick="showModal(40)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="relay">
+      <div class="img-wrap" onclick="showModal(41)">
+        <img src="images/fig42_mains_ac_relay_enclosure.svg" alt="42. TV Mains AC Relay Enclosure Schematic" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-relay">Mains Wiring</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 42</div>
+        <h3>42. TV Mains AC Relay Enclosure Schematic</h3>
+        <p>Galvanic break on Live conductor with isolated neutral and earth inside safety enclosure.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig42_mains_ac_relay_enclosure.svg</span>
+          <button class="view-btn" onclick="showModal(41)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="gps">
+      <div class="img-wrap" onclick="showModal(42)">
+        <img src="images/fig43_gps_distance_formula.svg" alt="43. GPS Great-Circle Haversine Formula" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-gps">Geodesic Math</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 43</div>
+        <h3>43. GPS Great-Circle Haversine Formula</h3>
+        <p>Mathematical model translating latitude/longitude coordinate pairs into walked distance.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig43_gps_distance_formula.svg</span>
+          <button class="view-btn" onclick="showModal(42)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="step">
+      <div class="img-wrap" onclick="showModal(43)">
+        <img src="images/fig44_gravity_vector_calibration.svg" alt="44. Earth Gravity Vector Calibration" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-step">Calibration</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 44</div>
+        <h3>44. Earth Gravity Vector Calibration</h3>
+        <p>Static 1G (9.81 m/s^2) cancellation enabling orientation-invariant footfall capture.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig44_gravity_vector_calibration.svg</span>
+          <button class="view-btn" onclick="showModal(43)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="fair">
+      <div class="img-wrap" onclick="showModal(44)">
+        <img src="images/fig45_3d_exploded_enclosure.svg" alt="45. Exploded Wearable Watch Assembly" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-fair">Mechanical Stackup</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 45</div>
+        <h3>45. Exploded Wearable Watch Assembly</h3>
+        <p>Physical assembly stackup diagram for commercial 3D-printed wristband packaging.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig45_3d_exploded_enclosure.svg</span>
+          <button class="view-btn" onclick="showModal(44)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="hw">
+      <div class="img-wrap" onclick="showModal(45)">
+        <img src="images/fig46_breadboard_physical_layout.svg" alt="46. Breadboard Physical Prototyping Map" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-hw">Breadboard Layout</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 46</div>
+        <h3>46. Breadboard Physical Prototyping Map</h3>
+        <p>Tie-point allocation across 400 solderless breadboard rows separating analog and digital lines.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig46_breadboard_physical_layout.svg</span>
+          <button class="view-btn" onclick="showModal(45)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="hw">
+      <div class="img-wrap" onclick="showModal(46)">
+        <img src="images/fig47_firmware_loop_schedule.svg" alt="47. Firmware Execution Timing Schedule" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-hw">RTOS Schedule</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 47</div>
+        <h3>47. Firmware Execution Timing Schedule</h3>
+        <p>Non-blocking 50 Hz cyclic execution schedule avoiding delay() thread stalls.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig47_firmware_loop_schedule.svg</span>
+          <button class="view-btn" onclick="showModal(46)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="fair">
+      <div class="img-wrap" onclick="showModal(47)">
+        <img src="images/fig48_presentation_trifold_poster.svg" alt="48. Science Fair Trifold Poster Layout" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-fair">Poster Layout</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 48</div>
+        <h3>48. Science Fair Trifold Poster Layout</h3>
+        <p>3-panel storytelling layout designed for science competition evaluators and judges.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig48_presentation_trifold_poster.svg</span>
+          <button class="view-btn" onclick="showModal(47)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="fair">
+      <div class="img-wrap" onclick="showModal(48)">
+        <img src="images/fig49_anti_tamper_cheat_matrix.svg" alt="49. Anti-Tamper Security & Cheat Matrix" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-fair">Security Defense</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 49</div>
+        <h3>49. Anti-Tamper Security & Cheat Matrix</h3>
+        <p>Four-tier defensive logic defeating mechanical, electrical, and power-cycling bypasses.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig49_anti_tamper_cheat_matrix.svg</span>
+          <button class="view-btn" onclick="showModal(48)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>    <div class="gallery-card" data-cat="hw">
+      <div class="img-wrap" onclick="showModal(49)">
+        <img src="images/fig50_complete_integration_flowchart.svg" alt="50. Complete System Integration Cycle" loading="lazy"/>
+        <div class="img-overlay"><span class="img-tag tag-hw">System Cycle</span></div>
+      </div>
+      <div class="card-content">
+        <div class="card-num">FIGURE 50</div>
+        <h3>50. Complete System Integration Cycle</h3>
+        <p>Closed-loop lifecycle journey from kinetic footstep to television relay actuation.</p>
+        <div class="card-footer">
+          <span class="card-meta">fig50_complete_integration_flowchart.svg</span>
+          <button class="view-btn" onclick="showModal(49)">Enlarge &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- LIGHTBOX MODAL -->
+<div class="modal" id="imageModal" onclick="closeModal()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal()">&times;</button>
+    <img id="modalImg" class="modal-img" src="" alt="Enlarged Project View"/>
+    <h2 id="modalTitle" class="modal-title"></h2>
+    <p id="modalDesc" class="modal-desc"></p>
+  </div>
+</div>
+
+<script>
+const galleryItems = [
+  { src: 'images/hardware_prototype_overview_1793602478676.jpg', title: '01. Complete Hardware Prototype', desc: 'Complete breadboard prototype integrating ESP32-C3, ADXL345, OLED, 5V Relay, and NEO-6M GPS.' },
+  { src: 'images/adxl345_step_detection_walking_1793602474657.jpg', title: '02. Walking & Step Detection Test', desc: 'Handheld field testing of the ADXL345 dynamic low-pass delta filter capturing real footstep impulses.' },
+  { src: 'images/neo6m_gps_outdoor_tracking_1793602481978.jpg', title: '03. GPS Outdoor Tracking & Distance', desc: 'Satellite tracking on a running track validating real distance (0.85 km) and Doppler speed (4.2 km/h).' },
+  { src: 'images/oled_display_macro_1793602478614.jpg', title: '04. OLED Display & 20s Progress Bar', desc: 'Miniature 0.91-inch 128x32 screen showing stickman animation, speech quotes, and accumulator bar.' },
+  { src: 'images/relay_tv_power_control_png_1793602484986.jpg', title: '05. 5V Relay TV Power Control', desc: 'Active-LOW relay switching television power while 1-second countdown decrements remaining steps.' },
+  { src: 'images/science_fair_pedometer_booth_1793602519436.jpg', title: '06. School Science Fair Booth', desc: 'Presentation booth display featuring trifold poster, breadboard prototype, and live laptop telemetry.' },
+  { src: 'images/esp32_c3_pin_wiring_macro_1793602843143.jpg', title: '07. ESP32-C3 Board & Wiring Macro', desc: 'Macro shot of the 32-bit RISC-V development board, RF shield, USB-C, and color-coded DuPont routing.' },
+  { src: 'images/wearable_pedometer_wristband_prototype_1793602840123.jpg', title: '08. 3D-Printed Wearable Watch', desc: 'Product evolution concept showing the circuit miniaturized inside a custom 3D-printed sports wristband.' },
+  { src: 'images/adxl345_sensor_calibration_multimeter_testing_1793602840082.jpg', title: '09. ADXL345 Calibration Testing', desc: 'Laboratory measurement verifying clean 3.3V power rails and oscilloscope tracing of 100 kHz I2C signals.' },
+  { src: 'images/neo6m_gps_antenna_macro_1793602846170.jpg', title: '10. NEO-6M GPS Ceramic Antenna Macro', desc: 'Close-up of the 25x25mm patch antenna, U-blox receiver silicon, backup battery, and 1PPS lock LED.' },
+  { src: 'images/tv_power_cut_off_event_1793602878212.jpg', title: '11. TV Power Cut-Off Event', desc: 'Step count reaches 0: relay de-energizes, OLED prompts Walk 2 get steps!, and the television cuts off.' },
+  { src: 'images/esp32_nvs_persistence_powerup_1793602889237.jpg', title: '12. NVS Flash Memory Retention', desc: 'Reconnecting USB power proves non-volatile step storage: loads 'Steps saved: 1250' from flash.' },
+  { src: 'images/student_breadboard_assembly_1793602893427.jpg', title: '13. Student Breadboard Assembly', desc: 'Hands-on construction showing wiring tweezers, wire strippers, digital calipers, and printed pinouts.' },
+  { src: 'images/smart_pedometer_prototype_1793531618535.jpg', title: '14. Maker Workbench Prototype', desc: 'Initial working prototype running on a wooden workshop desk validating display and relay triggering.' },
+  { src: 'images/fig15_system_architecture_block.svg', title: '15. High-Level Architecture Block', desc: 'Complete system block diagram connecting sensors, microcontroller, display, and power rails.' },
+  { src: 'images/fig16_color_schematic_wiring.svg', title: '16. Color-Coded Schematic Wiring', desc: 'Comprehensive wiring diagram with wire colors matching CIRCUIT_DIAGRAM.md specifications.' },
+  { src: 'images/fig17_esp32c3_pinout_map.svg', title: '17. ESP32-C3 Dedicated Pinout Map', desc: 'Pin routing map for GPIO 0, 1, 2, 4, 5, 6, 3V3, GND, and 5V VBUS.' },
+  { src: 'images/fig18_adxl345_architecture.svg', title: '18. ADXL345 Register & Pin Architecture', desc: 'Internal register map (DATAX0-Z1), I2C address 0x53, and +/-4g dynamic range settings.' },
+  { src: 'images/fig19_ssd1306_oled_geometry.svg', title: '19. SSD1306 OLED (128x32) Pixel Geometry', desc: 'Screen zone partitioning: Speech text row, Stickman animation box, and numerical step readout.' },
+  { src: 'images/fig20_relay_module_circuit.svg', title: '20. 5V Relay Switching & Isolation Circuit', desc: 'Optocoupler isolation and COM/NO output terminals safely driving the television load.' },
+  { src: 'images/fig21_neo6m_gps_architecture.svg', title: '21. NEO-6M GPS Architecture & Patch', desc: 'UART serial streaming pinout, 25x25mm ceramic patch antenna, and 1PPS lock indicator.' },
+  { src: 'images/fig22_i2c_bus_timing_protocol.svg', title: '22. Shared I2C Bus Timing & Topology', desc: 'Master-slave shared bus architecture on GPIO 4 (SDA) and GPIO 5 (SCL) at 100 kHz.' },
+  { src: 'images/fig23_uart_serial_gps_stream.svg', title: '23. UART1 Asynchronous NMEA Stream', desc: 'Dedicated serial stream from NEO-6M to ESP32-C3 GPIO 0 RX at 9600 baud.' },
+  { src: 'images/fig24_accelerometer_waveform_filter.svg', title: '24. Dynamic Delta Waveform Filter', desc: 'Waveform comparison: rejection of low-impact arm shaking vs acceptance of true footfalls.' },
+  { src: 'images/fig25_finite_state_machine.svg', title: '25. Finite State Machine Transitions', desc: 'Deterministic 5-state firmware loop governing boot, walking, TV power, and zero cut-off.' },
+  { src: 'images/fig26_20s_accumulator_flowchart.svg', title: '26. 20-Second Accumulator Algorithm', desc: 'Time accumulation engine requiring 20 continuous seconds of walking to earn 1 TV second.' },
+  { src: 'images/fig27_gps_velocity_gating.svg', title: '27. GPS Doppler Velocity Validation Gate', desc: 'Speed-gated step increment logic requiring velocity >= 0.5 km/h when satellites are locked.' },
+  { src: 'images/fig28_nvs_flash_memory_schema.svg', title: '28. ESP32 NVS Flash Partition Schema', desc: 'Storage architecture for 'steps' and 'walkAcc' keys with native flash wear-leveling.' },
+  { src: 'images/fig29_relay_active_low_logic.svg', title: '29. Relay Active-LOW Optocoupler Circuit', desc: 'Low-side drive logic: GPIO 2 LOW turns on relay coil; GPIO 2 HIGH de-energizes coil.' },
+  { src: 'images/fig30_gpio6_sense_circuit.svg', title: '30. GPIO 6 Hardware Sense Circuit', desc: 'Pull-up loop detecting physical relay disconnection to immediately freeze step balances.' },
+  { src: 'images/fig31_stickman_frame_0.svg', title: '31. OLED Stickman Frame 0 (Stride Left)', desc: 'First keyframe in 140ms animation loop showing left arm/leg forward stance.' },
+  { src: 'images/fig32_stickman_frame_1.svg', title: '32. OLED Stickman Frame 1 (Mid-Step Bob)', desc: 'Vertical bob elevation (-1px offset) simulating natural center-of-mass elevation.' },
+  { src: 'images/fig33_stickman_frame_2.svg', title: '33. OLED Stickman Frame 2 (Stride Right)', desc: 'Opposite limb stride completing symmetrical bilateral locomotion cycle.' },
+  { src: 'images/fig34_stickman_frame_3.svg', title: '34. OLED Stickman Frame 3 (Return Stance)', desc: 'Recovery keyframe transitioning back into Frame 0 continuous loop.' },
+  { src: 'images/fig35_oled_layout_a_steps.svg', title: '35. OLED Layout A (Pedometer Mode)', desc: 'Step counter screen layout with animated stickman, motivational quote, and progress bar.' },
+  { src: 'images/fig36_oled_layout_b_gps.svg', title: '36. OLED Layout B (GPS Distance Mode)', desc: 'GPS mode screen layout alternating every 3 seconds to show kilometers and speed.' },
+  { src: 'images/fig37_power_distribution_tree.svg', title: '37. Power Distribution Tree', desc: '5V USB-C VBUS power rail partitioning and 3.3V LDO regulator subsystem.' },
+  { src: 'images/fig38_current_consumption_chart.svg', title: '38. Current Consumption Breakdown', desc: 'Module-by-module load analysis showing ~85mA operating draw for 11+ hours on 1000mAh.' },
+  { src: 'images/fig39_cadence_debounce_timing.svg', title: '39. Cadence Debounce Timing Diagram', desc: '400ms refractory timing window eliminating mechanical contact bounce and arm tremor.' },
+  { src: 'images/fig40_boot_sequence_memory_flow.svg', title: '40. Boot Sequence & Memory Recovery Flow', desc: 'Cold-boot initialization timeline restoring user step balance from flash storage.' },
+  { src: 'images/fig41_relay_disconnect_freeze.svg', title: '41. Relay Disconnect Anti-Tamper Sequence', desc: 'Real-time pull-up sensing halting countdown decrements if relay jumper is pulled.' },
+  { src: 'images/fig42_mains_ac_relay_enclosure.svg', title: '42. TV Mains AC Relay Enclosure Schematic', desc: 'Galvanic break on Live conductor with isolated neutral and earth inside safety enclosure.' },
+  { src: 'images/fig43_gps_distance_formula.svg', title: '43. GPS Great-Circle Haversine Formula', desc: 'Mathematical model translating latitude/longitude coordinate pairs into walked distance.' },
+  { src: 'images/fig44_gravity_vector_calibration.svg', title: '44. Earth Gravity Vector Calibration', desc: 'Static 1G (9.81 m/s^2) cancellation enabling orientation-invariant footfall capture.' },
+  { src: 'images/fig45_3d_exploded_enclosure.svg', title: '45. Exploded Wearable Watch Assembly', desc: 'Physical assembly stackup diagram for commercial 3D-printed wristband packaging.' },
+  { src: 'images/fig46_breadboard_physical_layout.svg', title: '46. Breadboard Physical Prototyping Map', desc: 'Tie-point allocation across 400 solderless breadboard rows separating analog and digital lines.' },
+  { src: 'images/fig47_firmware_loop_schedule.svg', title: '47. Firmware Execution Timing Schedule', desc: 'Non-blocking 50 Hz cyclic execution schedule avoiding delay() thread stalls.' },
+  { src: 'images/fig48_presentation_trifold_poster.svg', title: '48. Science Fair Trifold Poster Layout', desc: '3-panel storytelling layout designed for science competition evaluators and judges.' },
+  { src: 'images/fig49_anti_tamper_cheat_matrix.svg', title: '49. Anti-Tamper Security & Cheat Matrix', desc: 'Four-tier defensive logic defeating mechanical, electrical, and power-cycling bypasses.' },
+  { src: 'images/fig50_complete_integration_flowchart.svg', title: '50. Complete System Integration Cycle', desc: 'Closed-loop lifecycle journey from kinetic footstep to television relay actuation.' },
+
+];
+
+function showModal(idx){
+  const item = galleryItems[idx];
+  document.getElementById('modalImg').src = item.src;
+  document.getElementById('modalTitle').textContent = item.title;
+  document.getElementById('modalDesc').textContent = item.desc;
+  document.getElementById('imageModal').classList.add('active');
+}
+function closeModal(){
+  document.getElementById('imageModal').classList.remove('active');
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+function filterGallery(category, btn){
+  document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  const cards = document.querySelectorAll('.gallery-card');
+  cards.forEach(card => {
+    if (category === 'all' || card.dataset.cat === category) {
+      card.style.display = 'flex';
+    } else {
+      card.style.display = 'none';
+    }
+  });
+}
+</script>
+
+</body>
+</html>

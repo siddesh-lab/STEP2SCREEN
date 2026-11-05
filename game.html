@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Pedometer Quest: The ESP32-C3 Hardware Arcade Game</title>
+<style>
+:root {
+  --green:  #00ff77;
+  --blue:   #3b82f6;
+  --purple: #8b5cf6;
+  --yellow: #f59e0b;
+  --red:    #ef4444;
+  --cyan:   #06b6d4;
+  --bg:     #060a12;
+  --card:   #0d1424;
+  --card2:  #141f36;
+  --border: #1a2948;
+  --text:   #e2e8f0;
+  --muted:  #64748b;
+}
+* { margin:0; padding:0; box-sizing:border-box; user-select:none; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+/* TOP STATUS HUD */
+.hud-bar {
+  background: rgba(13, 20, 36, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 2px solid var(--border);
+  padding: 10px 20px;
+  position: sticky; top: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px;
+}
+.hud-title {
+  font-weight: 900; font-size: 15px; color: var(--green);
+  display: flex; align-items: center; gap: 8px; letter-spacing: 0.5px;
+}
+.hud-stats {
+  display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+}
+.hud-badge {
+  background: var(--card2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 4px 12px; font-size: 12px;
+  display: flex; align-items: center; gap: 6px; font-family: monospace;
+}
+.hud-badge strong { color: #fff; font-size: 13px; }
+.sound-btn {
+  background: var(--card2); border: 1px solid var(--border);
+  color: var(--text); border-radius: 8px; padding: 4px 10px;
+  cursor: pointer; font-size: 13px; transition: .2s;
+}
+.sound-btn:hover { border-color: var(--green); color: var(--green); }
+
+/* MAIN GAME CONTAINER */
+.game-viewport {
+  max-width: 1040px; margin: 20px auto 40px; padding: 0 16px;
+}
+
+/* STAGE CONTAINER */
+.stage-card {
+  background: var(--card); border: 2px solid var(--border);
+  border-radius: 20px; padding: 26px; box-shadow: 0 15px 40px rgba(0,0,0,0.6);
+  position: relative; overflow: hidden;
+}
+.stage-card::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 50% 0%, rgba(0,255,119,0.06) 0%, transparent 70%);
+  pointer-events: none;
+}
+.stage-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 20px; gap: 16px; border-bottom: 1px solid var(--border); padding-bottom: 14px;
+}
+.stage-tag {
+  font-size: 11px; font-weight: 800; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--green); margin-bottom: 4px;
+}
+.stage-title { font-size: 1.5rem; font-weight: 900; color: #fff; }
+.stage-desc { font-size: 13.5px; color: var(--muted); margin-top: 4px; }
+
+/* PROGRESS STEPPER */
+.stepper {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+  margin-bottom: 24px;
+}
+.step-pill {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 12px; text-align: center;
+  font-size: 11px; font-weight: 700; color: var(--muted);
+  transition: all .25s ease;
+}
+.step-pill.active {
+  border-color: var(--green); color: var(--green);
+  background: rgba(0, 255, 119, 0.1); box-shadow: 0 0 15px rgba(0,255,119,0.2);
+}
+.step-pill.done {
+  border-color: var(--cyan); color: #fff; background: rgba(6, 182, 212, 0.12);
+}
+
+/* OLED VIRTUAL MIRROR */
+.oled-box {
+  background: #000; border: 3px solid #1a2538; border-radius: 10px;
+  padding: 8px; box-shadow: inset 0 0 20px #000, 0 0 25px rgba(0,255,119,0.15);
+  display: inline-block; width: 100%; max-width: 320px;
+}
+#virtualOLED {
+  display: block; width: 100%; height: auto; image-rendering: pixelated;
+}
+
+/* BUTTONS */
+.btn-game {
+  background: linear-gradient(135deg, var(--green), #06b6d4);
+  color: #050a12; font-weight: 900; font-size: 15px;
+  padding: 14px 26px; border-radius: 12px; border: none;
+  cursor: pointer; transition: all .2s; box-shadow: 0 6px 20px rgba(0,255,119,0.3);
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn-game:hover {
+  transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,255,119,0.45);
+}
+.btn-game:active { transform: scale(0.97); }
+.btn-game.secondary {
+  background: var(--card2); color: var(--text);
+  border: 1px solid var(--border); box-shadow: none;
+}
+.btn-game.secondary:hover { border-color: var(--cyan); color: var(--cyan); }
+
+/* VIRTUAL WORKBENCH & CANVASES */
+.workbench-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+}
+@media(max-width: 768px) {
+  .workbench-grid { grid-template-columns: 1fr; }
+  .stepper { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* REAL-TIME SIGNAL GRAPH CANVAS */
+#graphCanvas, #gpsCanvas, #tvGameCanvas {
+  background: #040812; border: 1px solid var(--border);
+  border-radius: 12px; width: 100%; height: 200px; display: block;
+}
+
+/* TV CONSOLE IN LEVEL 3 */
+.tv-cabinet {
+  background: #111a2e; border: 4px solid #203154; border-radius: 20px;
+  padding: 16px; position: relative; box-shadow: inset 0 0 30px #000;
+}
+.tv-screen {
+  background: #000; border: 2px solid #00ff7744; border-radius: 12px;
+  overflow: hidden; height: 230px; position: relative;
+  display: flex; align-items: center; justify-content: center;
+}
+.tv-off-overlay {
+  position: absolute; inset: 0; background: #070b14;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: #ef4444; font-weight: 800; font-family: monospace; z-index: 10;
+  transition: opacity .3s;
+}
+.tv-off-overlay.hidden { display: none; }
+
+/* QUIZ CARDS */
+.quiz-opt {
+  background: var(--card2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 18px; margin-bottom: 10px;
+  cursor: pointer; font-size: 13.5px; transition: .2s; display: block;
+}
+.quiz-opt:hover { border-color: var(--green); color: var(--green); }
+.quiz-opt.correct { background: rgba(0,255,119,0.18); border-color: var(--green); color: #fff; font-weight: bold; }
+.quiz-opt.wrong { background: rgba(239,68,68,0.18); border-color: var(--red); color: #fff; }
+
+/* CERTIFICATE MODAL */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(2,5,12,0.92); backdrop-filter: blur(8px);
+  z-index: 999; display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.cert-card {
+  background: #0d172a; border: 4px solid #f59e0b; border-radius: 24px;
+  max-width: 680px; width: 100%; padding: 36px; text-align: center;
+  box-shadow: 0 0 60px rgba(245,158,11,0.3); position: relative;
+}
+.cert-badge { font-size: 3.5rem; margin-bottom: 8px; }
+.cert-title { font-size: 1.8rem; font-weight: 900; color: #fbbf24; }
+.cert-name {
+  font-size: 1.5rem; font-weight: 800; color: #fff;
+  border-bottom: 2px dashed #f59e0b; display: inline-block; padding: 4px 20px; margin: 14px 0;
+}
+</style>
+</head>
+<body>
+
+<!-- TOP HUD -->
+<header class="hud-bar">
+  <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+    <div class="hud-title">
+      <span>🚶</span> PEDOMETER QUEST <span style="font-size:11px;color:var(--muted);font-weight:400">ESP32-C3 ARCADE</span>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <a href="index.html" class="sound-btn" style="text-decoration:none">🖥️ Simulator</a>
+      <a href="gallery.html" class="sound-btn" style="text-decoration:none">📸 50 Figures</a>
+      <a href="presentation_kit/speech.html" class="sound-btn" style="text-decoration:none">🎤 Speech Kit</a>
+      <a href="presentation_kit/information.html" class="sound-btn" style="text-decoration:none">📘 Dossier</a>
+    </div>
+  </div>
+  <div class="hud-stats">
+    <div class="hud-badge">👟 Steps: <strong id="hudSteps">0</strong></div>
+    <div class="hud-badge">📺 TV Bank: <strong id="hudTime">0s</strong></div>
+    <div class="hud-badge">⚡ Relay: <strong id="hudRelay" style="color:var(--red)">OFF</strong></div>
+    <div class="hud-badge">🛰️ GPS: <strong id="hudGps" style="color:var(--cyan)">NO FIX</strong></div>
+    <button class="sound-btn" id="soundBtn" onclick="toggleAudio()">🔊 Audio: ON</button>
+  </div>
+</header>
+
+<main class="game-viewport">
+
+  <!-- STEPPER NAV -->
+  <div class="stepper">
+    <div class="step-pill active" id="pill-1">1. Calibration</div>
+    <div class="step-pill" id="pill-2">2. GPS Expedition</div>
+    <div class="step-pill" id="pill-3">3. Relay Room</div>
+    <div class="step-pill" id="pill-4">4. Anti-Tamper</div>
+    <div class="step-pill" id="pill-5">5. Science Fair Boss</div>
+  </div>
+
+  <!-- STAGE 1: ADXL345 SENSOR CALIBRATION -->
+  <div class="stage-card" id="stage-1">
+    <div class="stage-header">
+      <div>
+        <div class="stage-tag">STAGE 01 &middot; ADXL345 CALIBRATION</div>
+        <h1 class="stage-title">Learn the Biomechanical Step Impulse</h1>
+        <p class="stage-desc">
+          Defeat the fake arm-shakers! In our real code, casual wrist fidgeting stays below &Delta; 3.0 m/s&sup2; and gets rejected. You must generate genuine heel-strike impact spikes (&Delta; &gt; 3.0 m/s&sup2;) with a natural walking cadence (&ge;400ms delay).
+        </p>
+      </div>
+      <div class="oled-box">
+        <canvas id="virtualOLED1" width="128" height="32"></canvas>
+      </div>
+    </div>
+
+    <div class="workbench-grid">
+      <div>
+        <h3 style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:8px">LIVE ADXL345 WAVEFORM (&Delta; ACCELERATION DELTA)</h3>
+        <canvas id="graphCanvas"></canvas>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:6px;font-family:monospace">
+          <span>0.0 m/s&sup2; (Rest)</span>
+          <span style="color:var(--red)">&Delta; 3.0 m/s&sup2; Threshold</span>
+          <span>&plusmn;16G Range</span>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;justify-content:center;gap:14px;background:var(--card2);padding:20px;border-radius:14px;border:1px solid var(--border)">
+        <div style="font-size:14px;font-weight:700;color:#fff">Walk Controls:</div>
+        <p style="font-size:12.5px;color:var(--muted)">
+          Click <strong>"Footfall Strike"</strong> rhythmically like real walking. If you spam too quickly, the 400ms cadence debounce blocks it! Try "Fake Wrist Shake" to see how the filter rejects couch-shakers!
+        </p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn-game" id="btnStep" onclick="triggerStepImpact(false)">👟 Take Step Impact (Walk)</button>
+          <button class="btn-game secondary" onclick="triggerStepImpact(true)">🤏 Fake Wrist Shake</button>
+        </div>
+        <div style="font-size:12px;font-family:monospace;color:var(--yellow)" id="stepFeedback">
+          Goal: Accumulate 10 Valid Steps (10s TV Time) to unlock Stage 2!
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;text-align:right">
+      <button class="btn-game" id="btnNext1" style="display:none" onclick="goToStage(2)">Proceed to Stage 2: GPS Expedition &rarr;</button>
+    </div>
+  </div>
+
+  <!-- STAGE 2: NEO-6M GPS EXPEDITION -->
+  <div class="stage-card" id="stage-2" style="display:none">
+    <div class="stage-header">
+      <div>
+        <div class="stage-tag">STAGE 02 &middot; SATELLITE VELOCITY GATING</div>
+        <h1 class="stage-title">NEO-6M GPS Outdoor Mission</h1>
+        <p class="stage-desc">
+          To stop people from shaking their watch indoors while sitting on the couch, the ESP32-C3 connects to a NEO-6M GPS over UART1 (GPIO 0 RX / GPIO 1 TX). Steps only accumulate when Doppler speed &ge; 0.5 km/h!
+        </p>
+      </div>
+      <div class="oled-box">
+        <canvas id="virtualOLED2" width="128" height="32"></canvas>
+      </div>
+    </div>
+
+    <div class="workbench-grid">
+      <div>
+        <h3 style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:8px">OUTDOOR TRACK RADAR (FOLLOW THE WAYPOINTS)</h3>
+        <canvas id="gpsCanvas"></canvas>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:6px;font-family:monospace">
+          <span>Speed: <strong id="gpsSpeedRead" style="color:var(--cyan)">0.0 km/h</strong></span>
+          <span>Target: <strong style="color:var(--green)">Speed &ge; 0.5 km/h</strong></span>
+          <span>Sats: <strong style="color:var(--yellow)" id="gpsSatCount">0 Fixed</strong></span>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;justify-content:center;gap:14px;background:var(--card2);padding:20px;border-radius:14px;border:1px solid var(--border)">
+        <div style="font-size:14px;font-weight:700;color:#fff">Expedition Controls:</div>
+        <p style="font-size:12.5px;color:var(--muted)">
+          Click <strong>"Accelerate Pace"</strong> to walk forward along the track. Collect 3 Satellite Beacons and cross 100 meters while keeping velocity above 0.5 km/h!
+        </p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn-game" onclick="acceleratePlayer()">🏃 Accelerate Pace (Move)</button>
+          <button class="btn-game secondary" onclick="stopPlayer()">🛑 Stop Standing Still</button>
+        </div>
+        <div style="font-size:12px;font-family:monospace;color:var(--cyan)" id="gpsFeedback">
+          Acquiring 3D satellite lock... Move forward!
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;text-align:right">
+      <button class="btn-game" id="btnNext2" style="display:none" onclick="goToStage(3)">Proceed to Stage 3: The TV Relay Room &rarr;</button>
+    </div>
+  </div>
+
+  <!-- STAGE 3: THE RELAY TV ROOM -->
+  <div class="stage-card" id="stage-3" style="display:none">
+    <div class="stage-header">
+      <div>
+        <div class="stage-tag">STAGE 03 &middot; 5V RELAY ACTUATION</div>
+        <h1 class="stage-title">The TV Appliance Room</h1>
+        <p class="stage-desc">
+          You earned steps! Now experience physical hardware enforcement. The 5V relay uses active-LOW logic (GPIO 2 LOW turns the TV on). Watch the TV turn on and play! But every second of watching drains 1 step.
+        </p>
+      </div>
+      <div class="oled-box">
+        <canvas id="virtualOLED3" width="128" height="32"></canvas>
+      </div>
+    </div>
+
+    <div class="workbench-grid">
+      <!-- VIRTUAL TV CABINET -->
+      <div class="tv-cabinet">
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:8px;font-family:monospace">
+          <span>APPLIANCE: 4K TELEVISION</span>
+          <span>IN1 RELAY: <strong id="tvRelayStatus" style="color:var(--red)">OFF</strong></span>
+        </div>
+        <div class="tv-screen">
+          <canvas id="tvGameCanvas" width="400" height="230"></canvas>
+          <div class="tv-off-overlay" id="tvOffOverlay">
+            <span style="font-size:2rem;margin-bottom:6px">⚡ POWER CUT ⚡</span>
+            <span>RELAY DE-ENERGIZED (GPIO 2 HIGH)</span>
+            <span style="font-size:12px;color:var(--muted);margin-top:6px">"WALK 2 GET STEPS!"</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- RELAY CONTROL CONSOLE -->
+      <div style="display:flex;flex-direction:column;justify-content:center;gap:14px;background:var(--card2);padding:20px;border-radius:14px;border:1px solid var(--border)">
+        <div style="font-size:14px;font-weight:700;color:#fff">Relay Hardware Switches:</div>
+        <p style="font-size:12.5px;color:var(--muted)">
+          Toggle <strong>GPIO 2 (Relay IN1)</strong> to close the circuit! If you have steps remaining, the TV powers on instantly. Play the built-in TV Space Game using arrow keys or tap!
+        </p>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn-game" id="btnRelayPower" onclick="toggleRelayPower()">⚡ Energize Relay (GPIO 2 LOW)</button>
+          <button class="btn-game secondary" onclick="addEmergencySteps()">👟 Walk +15 Bonus Steps</button>
+        </div>
+
+        <div style="background:#070d18;padding:12px;border-radius:10px;font-family:monospace;font-size:12px;color:var(--yellow)" id="tvConsoleFeedback">
+          Relay is OFF. Click "Energize Relay" to test the TV!
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;text-align:right">
+      <button class="btn-game" id="btnNext3" style="display:none" onclick="goToStage(4)">Proceed to Stage 4: Anti-Tamper Test &rarr;</button>
+    </div>
+  </div>
+
+  <!-- STAGE 4: ANTI-TAMPER & NVS MEMORY SURVIVAL -->
+  <div class="stage-card" id="stage-4" style="display:none">
+    <div class="stage-header">
+      <div>
+        <div class="stage-tag">STAGE 04 &middot; SECURITY &amp; FLASH RETENTION</div>
+        <h1 class="stage-title">Tamper Defense &amp; Flash Memory</h1>
+        <p class="stage-desc">
+          A sneaky user tries to cheat! They attempt to pull the relay jumper wire to freeze the TV countdown, or pull the USB power plug to wipe their balance. Test our GPIO 6 sense pin and ESP32 NVS flash persistence!
+        </p>
+      </div>
+      <div class="oled-box">
+        <canvas id="virtualOLED4" width="128" height="32"></canvas>
+      </div>
+    </div>
+
+    <div class="workbench-grid">
+      <!-- HARDWARE PULL SIMULATOR -->
+      <div style="background:#060b16;border:1px solid var(--border);border-radius:14px;padding:22px;display:flex;flex-direction:column;gap:16px">
+        <h3 style="font-size:14px;color:#fff;font-weight:800">Tamper Simulation Rig:</h3>
+        
+        <div style="background:var(--card2);padding:14px;border-radius:10px;border-left:4px solid var(--green)">
+          <div style="font-size:12px;font-weight:700;color:var(--green)">TEST A: GPIO 6 RELAY SENSE JUMPER</div>
+          <div style="font-size:12px;color:var(--muted);margin:4px 0 8px">Simulate pulling out the physical wire between Relay GND and GPIO 6.</div>
+          <button class="btn-game secondary" id="btnTamperSense" onclick="testTamperSense()">🔌 Pull Relay Wire (GPIO 6 HIGH)</button>
+        </div>
+
+        <div style="background:var(--card2);padding:14px;border-radius:10px;border-left:4px solid var(--purple)">
+          <div style="font-size:12px;font-weight:700;color:var(--purple)">TEST B: ABRUPT USB-C POWER CUT</div>
+          <div style="font-size:12px;color:var(--muted);margin:4px 0 8px">Simulate yanking the USB power cable while watching TV.</div>
+          <button class="btn-game secondary" id="btnPowerCut" onclick="testPowerCut()">⚡ Sever USB Power (Reboot ESP32)</button>
+        </div>
+      </div>
+
+      <!-- NVS FLASH LOG MONITOR -->
+      <div style="background:var(--card2);padding:20px;border-radius:14px;border:1px solid var(--border);display:flex;flex-direction:column">
+        <h3 style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:8px">ESP32 SERIAL BOOT &amp; SENSE LOG:</h3>
+        <div style="background:#02050b;border:1px solid var(--border);border-radius:10px;padding:12px;font-family:monospace;font-size:11.5px;color:#a78bfa;height:180px;overflow-y:auto" id="tamperSerialLog">
+          [SYSTEM] NVS partition mounted.<br/>
+          [MEMORY] Restored saved stepCount.<br/>
+          [SENSE] GPIO 6 initialized INPUT_PULLUP.<br/>
+        </div>
+        <div style="margin-top:10px;font-size:12px;color:var(--yellow);font-weight:bold" id="tamperGoalText">
+          Complete both Test A and Test B to unlock the Final Boss Quiz!
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;text-align:right">
+      <button class="btn-game" id="btnNext4" style="display:none" onclick="goToStage(5)">Face Stage 5: Science Fair Boss Quiz &rarr;</button>
+    </div>
+  </div>
+
+  <!-- STAGE 5: SCIENCE FAIR BOSS QUIZ -->
+  <div class="stage-card" id="stage-5" style="display:none">
+    <div class="stage-header">
+      <div>
+        <div class="stage-tag">STAGE 05 &middot; THE GRAND SCIENCE FAIR</div>
+        <h1 class="stage-title">Duel the Judge: Science Fair Defense</h1>
+        <p class="stage-desc">
+          The chief judge is testing your technical mastery! Answer all 3 technical hardware questions correctly to win the Grand Science Fair Trophy &amp; Official Engineering Certificate!
+        </p>
+      </div>
+      <div style="font-size:3rem">🏆</div>
+    </div>
+
+    <div id="quizContainer" style="max-width:700px;margin:0 auto">
+      <div id="quizQuestionBox" style="background:var(--card2);border:1px solid var(--border);border-radius:16px;padding:24px;margin-bottom:20px">
+        <div style="font-size:11px;font-weight:800;color:var(--cyan);margin-bottom:6px" id="quizNumber">QUESTION 1 OF 3</div>
+        <h3 style="font-size:1.15rem;font-weight:800;color:#fff;margin-bottom:16px" id="quizQuestionText">Question text goes here...</h3>
+        <div id="quizOptions"></div>
+      </div>
+      <div id="quizFeedback" style="font-size:13px;font-family:monospace;margin-bottom:14px;color:var(--yellow)"></div>
+    </div>
+  </div>
+
+</main>
+
+<!-- VICTORY CERTIFICATE MODAL -->
+<div class="modal-overlay" id="certModal" style="display:none">
+  <div class="cert-card">
+    <div class="cert-badge">🥇</div>
+    <div class="cert-title">CERTIFICATE OF ENGINEERING EXCELLENCE</div>
+    <p style="font-size:13px;color:var(--muted);margin-top:4px">Awarded for successfully designing, defending, and simulating the</p>
+    <div style="font-size:1.15rem;font-weight:900;color:var(--green);margin-top:8px">ESP32-C3 SMART PEDOMETER &amp; RELAY APPLIANCE SYSTEM</div>
+    <div class="cert-name" id="certPlayerName">CHAMPION HARDWARE ENGINEER</div>
+    <p style="font-size:13px;color:#cbd5e1;line-height:1.6;margin:12px 0">
+      Mastered: ADXL345 High-Intensity impact filtering (&Delta; &gt; 3.0 m/s&sup2;), NEO-6M GPS velocity validation (&ge; 0.5 km/h), Active-LOW relay galvanic isolation, and ESP32 NVS non-volatile flash memory preservation!
+    </p>
+    <div style="display:flex;gap:12px;justify-content:center;margin-top:20px">
+      <button class="btn-game" onclick="window.print()">🖨️ Print Certificate</button>
+      <button class="btn-game secondary" onclick="restartGame()">🔄 Play Again</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// =====================================================================
+// WEB AUDIO SYNTHESIZER (ZERO EXTERNAL DEPENDENCY SOUND FX)
+// =====================================================================
+let audioCtx = null;
+let soundEnabled = true;
+
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+}
+
+function playTone(freq, type, duration, vol = 0.1) {
+  if (!soundEnabled) return;
+  initAudio();
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+  gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + duration);
+}
+
+function playStepSound() { playTone(120, 'sine', 0.08, 0.25); }
+function playRelayClick(on) {
+  playTone(on ? 800 : 300, 'square', 0.05, 0.2);
+  setTimeout(() => playTone(on ? 1200 : 200, 'triangle', 0.04, 0.15), 30);
+}
+function playSuccessChime() {
+  playTone(523.25, 'triangle', 0.12, 0.2);
+  setTimeout(() => playTone(659.25, 'triangle', 0.12, 0.2), 80);
+  setTimeout(() => playTone(783.99, 'triangle', 0.25, 0.25), 160);
+}
+function playAlarm() {
+  playTone(400, 'sawtooth', 0.15, 0.15);
+  setTimeout(() => playTone(300, 'sawtooth', 0.2, 0.15), 150);
+}
+
+function toggleAudio() {
+  soundEnabled = !soundEnabled;
+  document.getElementById('soundBtn').textContent = soundEnabled ? '🔊 Audio: ON' : '🔇 Audio: OFF';
+}
+
+// =====================================================================
+// GLOBAL GAME STATE
+// =====================================================================
+let currentStage = 1;
+let totalSteps = 0;
+let tvSeconds = 0;
+let relayPowered = false;
+let relaySenseGrounded = true;
+let gpsLocked = false;
+let gpsSpeed = 0.0;
+let distanceWalked = 0;
+let testAPassed = false;
+let testBPassed = false;
+
+// OLED Stickman animation frames
+let oledFrame = 0;
+setInterval(() => { oledFrame = (oledFrame + 1) % 4; drawAllOLEDs(); }, 140);
+
+function updateHUD() {
+  document.getElementById('hudSteps').textContent = totalSteps;
+  document.getElementById('hudTime').textContent = tvSeconds + 's';
+  const relayEl = document.getElementById('hudRelay');
+  relayEl.textContent = relayPowered ? 'ON (GPIO 2 LOW)' : 'OFF (GPIO 2 HIGH)';
+  relayEl.style.color = relayPowered ? 'var(--green)' : 'var(--red)';
+
+  const gpsEl = document.getElementById('hudGps');
+  gpsEl.textContent = gpsLocked ? `${gpsSpeed.toFixed(1)} km/h` : 'NO FIX';
+  gpsEl.style.color = gpsLocked ? 'var(--cyan)' : 'var(--muted)';
+}
+
+function goToStage(num) {
+  currentStage = num;
+  for (let i = 1; i <= 5; i++) {
+    const stageEl = document.getElementById('stage-' + i);
+    const pillEl = document.getElementById('pill-' + i);
+    if (stageEl) stageEl.style.display = (i === num) ? 'block' : 'none';
+    if (pillEl) {
+      pillEl.className = 'step-pill' + (i === num ? ' active' : (i < num ? ' done' : ''));
+    }
+  }
+  playSuccessChime();
+  if (num === 2) initGPSCanvas();
+  if (num === 3) initTVCanvas();
+  if (num === 5) loadQuizQuestion(0);
+}
+
+// =====================================================================
+// VIRTUAL 0.91" OLED RENDERING (128x32 EXACT PIXEL REPLICA)
+// =====================================================================
+function drawOLED(canvasId, textTop, numberVal, isWalking) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, 128, 32);
+
+  // Top speech
+  ctx.fillStyle = '#00ff77';
+  ctx.font = 'bold 7px monospace';
+  ctx.fillText(textTop, 2, 7);
+
+  // Stickman (left)
+  const x = 14, y = 30;
+  const yOff = (isWalking && (oledFrame === 1 || oledFrame === 3)) ? -1 : 0;
+  const cy = y + yOff;
+  ctx.strokeStyle = '#00ff77';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(x, cy - 18, 3, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x, cy - 15); ctx.lineTo(x, cy - 7);
+  ctx.stroke();
+
+  // Limbs
+  if (!isWalking) {
+    ctx.beginPath();
+    ctx.moveTo(x, cy - 14); ctx.lineTo(x - 4, cy - 8);
+    ctx.moveTo(x, cy - 14); ctx.lineTo(x + 4, cy - 8);
+    ctx.moveTo(x, cy - 7); ctx.lineTo(x - 3, cy);
+    ctx.moveTo(x, cy - 7); ctx.lineTo(x + 3, cy);
+    ctx.stroke();
+  } else {
+    let aL, aR, lL, lR;
+    switch(oledFrame) {
+      case 0: lL = x+4; lR = x-4; aL = x-4; aR = x+4; break;
+      case 1: lL = x+1; lR = x-1; aL = x-1; aR = x+1; break;
+      case 2: lL = x-4; lR = x+4; aL = x+4; aR = x-4; break;
+      default: lL = x-1; lR = x+1; aL = x+1; aR = x-1; break;
+    }
+    ctx.beginPath();
+    ctx.moveTo(x, cy - 14); ctx.lineTo(aL, cy - 9);
+    ctx.moveTo(x, cy - 14); ctx.lineTo(aR, cy - 9);
+    ctx.moveTo(x, cy - 7); ctx.lineTo(lL, cy);
+    ctx.moveTo(x, cy - 7); ctx.lineTo(lR, cy);
+    ctx.stroke();
+  }
+
+  // Right number
+  ctx.fillStyle = '#00ff77';
+  ctx.font = 'bold 13px monospace';
+  let numStr = String(numberVal);
+  ctx.fillText(numStr, 80, 20);
+
+  // Bottom 1s progress line
+  const lineW = Math.min(Math.round((Date.now() % 1000) / 1000 * 97), 97);
+  ctx.fillRect(30, 31, lineW, 1);
+}
+
+function drawAllOLEDs() {
+  const speech = !relaySenseGrounded ? 'Plug in Relay!' : (tvSeconds === 0 ? 'Walk 2 get steps!' : 'Relay Connected!');
+  drawOLED('virtualOLED1', speech, totalSteps, isMoving);
+  drawOLED('virtualOLED2', gpsLocked ? `${gpsSpeed.toFixed(1)} km/h` : 'Seeking GPS', totalSteps, isMoving);
+  drawOLED('virtualOLED3', speech, tvSeconds, relayPowered);
+  drawOLED('virtualOLED4', speech, totalSteps, false);
+}
+
+// =====================================================================
+// STAGE 1: ADXL345 SENSOR CALIBRATION LOGIC
+// =====================================================================
+let graphHistory = new Array(50).fill(0);
+let lastStepTime = 0;
+let isMoving = false;
+
+function drawGraph() {
+  const canvas = document.getElementById('graphCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#030814';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Grid
+  ctx.strokeStyle = '#142138';
+  ctx.lineWidth = 1;
+  for (let y = 30; y < canvas.height; y += 30) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+  }
+
+  // 3.0 m/s^2 Threshold Line (red)
+  const threshY = canvas.height - (3.0 / 8.0 * canvas.height);
+  ctx.strokeStyle = '#ef4444';
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath(); ctx.moveTo(0, threshY); ctx.lineTo(canvas.width, threshY); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#ef4444';
+  ctx.font = '10px monospace';
+  ctx.fillText('THRESHOLD: Δ = 3.0 m/s²', 10, threshY - 4);
+
+  // Waveform line (green)
+  ctx.strokeStyle = '#00ff77';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  const stepX = canvas.width / (graphHistory.length - 1);
+  for (let i = 0; i < graphHistory.length; i++) {
+    const val = graphHistory[i];
+    const py = canvas.height - Math.min((val / 8.0) * canvas.height, canvas.height - 10);
+    if (i === 0) ctx.moveTo(0, py);
+    else ctx.lineTo(i * stepX, py);
+  }
+  ctx.stroke();
+}
+
+function triggerStepImpact(isFakeShake) {
+  const now = Date.now();
+  const delta = isFakeShake ? (1.2 + Math.random() * 0.8) : (3.4 + Math.random() * 2.2);
+
+  graphHistory.push(delta);
+  graphHistory.shift();
+  drawGraph();
+
+  const feedback = document.getElementById('stepFeedback');
+
+  if (isFakeShake) {
+    playTone(200, 'sawtooth', 0.1, 0.15);
+    feedback.textContent = `❌ Arm Shake Rejected! (Δ = ${delta.toFixed(2)} m/s² < 3.0 m/s²). Couch potato caught!`;
+    feedback.style.color = '#ef4444';
+    return;
+  }
+
+  // Check 400ms cadence delay
+  if (now - lastStepTime < 400) {
+    playTone(250, 'sawtooth', 0.1, 0.1);
+    feedback.textContent = `⚠️ Cadence Warning: Footsteps too fast! (<400ms debounce window).`;
+    feedback.style.color = '#f59e0b';
+    return;
+  }
+
+  // Accepted real step!
+  lastStepTime = now;
+  totalSteps++;
+  tvSeconds++;
+  isMoving = true;
+  playStepSound();
+  setTimeout(() => { isMoving = false; }, 600);
+
+  updateHUD();
+  feedback.textContent = `✅ Real Heel-Strike Step! (Δ = ${delta.toFixed(2)} m/s² > 3.0 m/s²). Earned +1s TV time!`;
+  feedback.style.color = '#00ff77';
+
+  if (totalSteps >= 10) {
+    document.getElementById('btnNext1').style.display = 'inline-flex';
+    playSuccessChime();
+  }
+}
+
+// =====================================================================
+// STAGE 2: NEO-6M GPS EXPEDITION
+// =====================================================================
+let playerX = 30, playerY = 100;
+let satellitesCollected = 0;
+let sats = [
+  { x: 120, y: 50, collected: false },
+  { x: 240, y: 140, collected: false },
+  { x: 340, y: 70, collected: false }
+];
+
+function initGPSCanvas() {
+  const canvas = document.getElementById('gpsCanvas');
+  canvas.width = canvas.parentElement.clientWidth || 400;
+  canvas.height = 200;
+  drawGPS();
+}
+
+function drawGPS() {
+  const canvas = document.getElementById('gpsCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#05111c';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Track path
+  ctx.strokeStyle = '#1e3852';
+  ctx.lineWidth = 40;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(30, 100);
+  ctx.lineTo(120, 50);
+  ctx.lineTo(240, 140);
+  ctx.lineTo(340, 70);
+  ctx.lineTo(canvas.width - 30, 100);
+  ctx.stroke();
+
+  // Satellites
+  sats.forEach((s, idx) => {
+    if (!s.collected) {
+      ctx.fillStyle = '#f59e0b';
+      ctx.beginPath(); ctx.arc(s.x, s.y, 8, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 9px monospace';
+      ctx.fillText(`SAT ${idx+1}`, s.x - 14, s.y - 12);
+    }
+  });
+
+  // Finish Gate
+  ctx.fillStyle = '#00ff77';
+  ctx.fillRect(canvas.width - 40, 80, 10, 40);
+  ctx.fillText('FINISH', canvas.width - 46, 74);
+
+  // Player icon
+  ctx.fillStyle = '#06b6d4';
+  ctx.beginPath(); ctx.arc(playerX, playerY, 10, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+}
+
+function acceleratePlayer() {
+  gpsSpeed = 3.5 + Math.random() * 1.5;
+  gpsLocked = true;
+  distanceWalked += 15;
+  totalSteps += 3;
+  tvSeconds += 3;
+  isMoving = true;
+  playStepSound();
+
+  // Move along path
+  playerX += 30;
+  if (playerX < 120) playerY = 100 - (playerX / 120) * 50;
+  else if (playerX < 240) playerY = 50 + ((playerX - 120) / 120) * 90;
+  else if (playerX < 340) playerY = 140 - ((playerX - 240) / 100) * 70;
+  else playerY = 70 + ((playerX - 340) / 60) * 30;
+
+  // Check satellites
+  sats.forEach(s => {
+    if (!s.collected && Math.hypot(playerX - s.x, playerY - s.y) < 25) {
+      s.collected = true;
+      satellitesCollected++;
+      playTone(880, 'sine', 0.15, 0.2);
+    }
+  });
+
+  document.getElementById('gpsSpeedRead').textContent = gpsSpeed.toFixed(1) + ' km/h';
+  document.getElementById('gpsSatCount').textContent = `${satellitesCollected}/3 Locked`;
+
+  const canvas = document.getElementById('gpsCanvas');
+  const fb = document.getElementById('gpsFeedback');
+
+  if (playerX >= canvas.width - 40 && satellitesCollected >= 3) {
+    fb.textContent = '🎉 Mission Accomplished! GPS velocity > 0.5 km/h verified & 3D lock established!';
+    fb.style.color = '#00ff77';
+    document.getElementById('btnNext2').style.display = 'inline-flex';
+    playSuccessChime();
+  } else {
+    fb.textContent = `Moving: ${gpsSpeed.toFixed(1)} km/h >= 0.5 km/h threshold! Distance: ${distanceWalked}m`;
+  }
+
+  updateHUD();
+  drawGPS();
+}
+
+function stopPlayer() {
+  gpsSpeed = 0.0;
+  isMoving = false;
+  document.getElementById('gpsSpeedRead').textContent = '0.0 km/h';
+  const fb = document.getElementById('gpsFeedback');
+  fb.textContent = '🛑 Stopped! (Speed 0.0 km/h < 0.5 km/h). Anti-cheat velocity gate pauses step accumulation!';
+  fb.style.color = '#ef4444';
+  playTone(200, 'sawtooth', 0.1, 0.1);
+  updateHUD();
+}
+
+// =====================================================================
+// STAGE 3: THE RELAY TV APPLIANCE ROOM (PLAYABLE MINI-TV GAME)
+// =====================================================================
+let tvBallX = 200, tvBallY = 110, tvBallDX = 2, tvBallDY = 1.5;
+let tvPaddleY = 90;
+let tvScore = 0;
+let tvInterval = null;
+
+function initTVCanvas() {
+  const canvas = document.getElementById('tvGameCanvas');
+  if (canvas) {
+    canvas.width = 400; canvas.height = 230;
+  }
+}
+
+function toggleRelayPower() {
+  if (tvSeconds <= 0) {
+    playAlarm();
+    alert('No steps remaining! Walk to get steps before energizing the TV relay.');
+    return;
+  }
+  relayPowered = !relayPowered;
+  playRelayClick(relayPowered);
+
+  const statusEl = document.getElementById('tvRelayStatus');
+  const overlay = document.getElementById('tvOffOverlay');
+  const btn = document.getElementById('btnRelayPower');
+  const fb = document.getElementById('tvConsoleFeedback');
+
+  if (relayPowered) {
+    statusEl.textContent = 'ON (GPIO 2 LOW)';
+    statusEl.style.color = '#00ff77';
+    overlay.classList.add('hidden');
+    btn.textContent = '⚡ De-energize Relay (GPIO 2 HIGH)';
+    fb.textContent = '>> [RELAY OUTPUT] ON (GPIO 2 LOW) - TV Powered! Countdown running.';
+    startTVCountdown();
+  } else {
+    statusEl.textContent = 'OFF (GPIO 2 HIGH)';
+    statusEl.style.color = '#ef4444';
+    overlay.classList.remove('hidden');
+    btn.textContent = '⚡ Energize Relay (GPIO 2 LOW)';
+    fb.textContent = '>> [RELAY OUTPUT] OFF (GPIO 2 HIGH) - TV Cut off.';
+    stopTVCountdown();
+  }
+  updateHUD();
+}
+
+function startTVCountdown() {
+  if (tvInterval) clearInterval(tvInterval);
+  tvInterval = setInterval(() => {
+    if (relayPowered && relaySenseGrounded && tvSeconds > 0) {
+      tvSeconds--;
+      updateHUD();
+      updateTVGame();
+      if (tvSeconds <= 0) {
+        // Cut-off event
+        relayPowered = false;
+        playRelayClick(false);
+        document.getElementById('tvRelayStatus').textContent = 'OFF';
+        document.getElementById('tvRelayStatus').style.color = '#ef4444';
+        document.getElementById('tvOffOverlay').classList.remove('hidden');
+        document.getElementById('btnRelayPower').textContent = '⚡ Energize Relay (GPIO 2 LOW)';
+        document.getElementById('tvConsoleFeedback').textContent = '>> TV COUNTDOWN EXPIRED (0s): Relay cut off power!';
+        stopTVCountdown();
+        updateHUD();
+      }
+      if (tvSeconds >= 5) {
+        document.getElementById('btnNext3').style.display = 'inline-flex';
+      }
+    }
+  }, 1000);
+}
+
+function stopTVCountdown() {
+  if (tvInterval) { clearInterval(tvInterval); tvInterval = null; }
+}
+
+function updateTVGame() {
+  const canvas = document.getElementById('tvGameCanvas');
+  if (!canvas || !relayPowered) return;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#0a1426';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Ball
+  tvBallX += tvBallDX; tvBallY += tvBallDY;
+  if (tvBallY < 10 || tvBallY > canvas.height - 10) tvBallDY = -tvBallDY;
+  if (tvBallX < 15) tvBallDX = -tvBallDX;
+  if (tvBallX > canvas.width - 25 && tvBallY > tvPaddleY && tvBallY < tvPaddleY + 50) {
+    tvBallDX = -tvBallDX;
+    tvScore++;
+    playTone(600, 'square', 0.05, 0.1);
+  }
+  if (tvBallX > canvas.width) { tvBallX = 200; tvBallY = 110; }
+
+  // Auto AI paddle
+  tvPaddleY += (tvBallY - (tvPaddleY + 25)) * 0.15;
+
+  ctx.fillStyle = '#00ff77';
+  ctx.beginPath(); ctx.arc(tvBallX, tvBallY, 6, 0, Math.PI * 2); ctx.fill();
+  ctx.fillRect(canvas.width - 20, tvPaddleY, 8, 50);
+
+  ctx.fillStyle = '#64748b';
+  ctx.font = '12px monospace';
+  ctx.fillText(`TV RETRO PONG &middot; SCORE: ${tvScore} &middot; REMAINING: ${tvSeconds}s`, 14, 24);
+}
+
+function addEmergencySteps() {
+  totalSteps += 15;
+  tvSeconds += 15;
+  updateHUD();
+  playSuccessChime();
+  document.getElementById('tvConsoleFeedback').textContent = 'Added +15 TV seconds balance from walking!';
+}
+
+// =====================================================================
+// STAGE 4: ANTI-TAMPER SENSE & NVS FLASH MEMORY SURVIVAL
+// =====================================================================
+function testTamperSense() {
+  relaySenseGrounded = !relaySenseGrounded;
+  const log = document.getElementById('tamperSerialLog');
+  const btn = document.getElementById('btnTamperSense');
+
+  if (!relaySenseGrounded) {
+    playAlarm();
+    btn.textContent = '🔌 Re-insert Relay Wire (GPIO 6 LOW)';
+    btn.style.borderColor = '#ef4444';
+    log.innerHTML += `<span style="color:#ef4444">> [SENSE TAMPER] GPIO 6 read HIGH! (Relay wire unplugged). Countdown FROZEN & Relay killed.</span><br/>`;
+    relayPowered = false;
+    document.getElementById('hudRelay').textContent = 'TAMPER HALT';
+    document.getElementById('hudRelay').style.color = '#ef4444';
+  } else {
+    playTone(500, 'sine', 0.1, 0.2);
+    btn.textContent = '🔌 Pull Relay Wire (GPIO 6 HIGH)';
+    btn.style.borderColor = 'var(--border)';
+    log.innerHTML += `<span style="color:#00ff77">> [SENSE TAMPER] GPIO 6 read LOW! Relay reconnected securely.</span><br/>`;
+    testAPassed = true;
+    checkStage4Unlock();
+  }
+  log.scrollTop = log.scrollHeight;
+  updateHUD();
+}
+
+function testPowerCut() {
+  playTone(150, 'sawtooth', 0.3, 0.3);
+  const log = document.getElementById('tamperSerialLog');
+  log.innerHTML = `<span style="color:#ef4444">*** POWER CUTTING OFF... VBUS 0V ***</span><br/>`;
+  setTimeout(() => {
+    playSuccessChime();
+    log.innerHTML += `<span style="color:#38bdf8">*** ESP32-C3 COLD BOOT (USB RESTORED) ***</span><br/>`;
+    log.innerHTML += `<span style="color:#00ff77">> [NVS RESTORE] Found namespace "pedometer". Restored steps: ${totalSteps} (Zero data loss!).</span><br/>`;
+    log.scrollTop = log.scrollHeight;
+    testBPassed = true;
+    checkStage4Unlock();
+  }, 1000);
+}
+
+function checkStage4Unlock() {
+  if (testAPassed && testBPassed) {
+    document.getElementById('tamperGoalText').textContent = '🎉 Excellent! Both Tamper detection & NVS Flash storage verified!';
+    document.getElementById('tamperGoalText').style.color = '#00ff77';
+    document.getElementById('btnNext4').style.display = 'inline-flex';
+  }
+}
+
+// =====================================================================
+// STAGE 5: SCIENCE FAIR BOSS QUIZ
+// =====================================================================
+const quizData = [
+  {
+    q: "Why did we set the ADXL345 accelerometer range to High-Intensity ±16G instead of ±2G?",
+    opts: [
+      "To save battery power by turning off the Z-axis.",
+      "To capture high-intensity running and heel-strike deceleration spikes without sensor clipping.",
+      "Because 16G makes the OLED screen 16 times brighter.",
+      "Because ±16G is required for GPS communication."
+    ],
+    correct: 1,
+    exp: "Correct! The ±16G scale provides the widest dynamic range, allowing energetic running and vigorous walking to be measured accurately without saturation."
+  },
+  {
+    q: "How does our NEO-6M GPS integration prevent a student from cheating while sitting on a couch?",
+    opts: [
+      "It shocks the student with an electrical pulse.",
+      "It requires a Doppler speed of at least 0.5 km/h to validate real-world movement.",
+      "It locks the TV remote with a laser beam.",
+      "It sends an email to the school principal."
+    ],
+    correct: 1,
+    exp: "Spot on! The GPS Doppler velocity gate requires speed >= 0.5 km/h when satellites are locked, preventing artificial couch shaking."
+  },
+  {
+    q: "What role does the GPIO 6 Hardware Sense Pin play in the project?",
+    opts: [
+      "It measures ambient room temperature.",
+      "It is an INPUT_PULLUP line that detects if the relay wire is unplugged and freezes countdown to protect time.",
+      "It resets the ESP32 chip every 10 seconds.",
+      "It broadcasts WiFi signals to the TV."
+    ],
+    correct: 1,
+    exp: "Bingo! GPIO 6 detects if the relay is disconnected. If pulled, it halts countdown abuse and alerts 'Plug in Relay!'."
+  }
+];
+
+let quizIdx = 0;
+let quizScore = 0;
+
+function loadQuizQuestion(idx) {
+  quizIdx = idx;
+  const q = quizData[idx];
+  document.getElementById('quizNumber').textContent = `QUESTION ${idx + 1} OF ${quizData.length}`;
+  document.getElementById('quizQuestionText').textContent = q.q;
+  document.getElementById('quizFeedback').textContent = '';
+
+  const optsContainer = document.getElementById('quizOptions');
+  optsContainer.innerHTML = '';
+
+  q.opts.forEach((opt, optIdx) => {
+    const btn = document.createElement('div');
+    btn.className = 'quiz-opt';
+    btn.textContent = opt;
+    btn.onclick = () => handleAnswer(optIdx, btn);
+    optsContainer.appendChild(btn);
+  });
+}
+
+function handleAnswer(choice, btnEl) {
+  const q = quizData[quizIdx];
+  const allOpts = document.querySelectorAll('.quiz-opt');
+  allOpts.forEach(b => b.onclick = null);
+
+  if (choice === q.correct) {
+    btnEl.classList.add('correct');
+    playSuccessChime();
+    document.getElementById('quizFeedback').textContent = '✅ ' + q.exp;
+    document.getElementById('quizFeedback').style.color = '#00ff77';
+    quizScore++;
+    setTimeout(() => {
+      if (quizIdx + 1 < quizData.length) {
+        loadQuizQuestion(quizIdx + 1);
+      } else {
+        showVictoryCertificate();
+      }
+    }, 1800);
+  } else {
+    btnEl.classList.add('wrong');
+    playTone(180, 'sawtooth', 0.25, 0.2);
+    document.getElementById('quizFeedback').textContent = '❌ Incorrect. Review the specs and try again!';
+    document.getElementById('quizFeedback').style.color = '#ef4444';
+    setTimeout(() => loadQuizQuestion(quizIdx), 1600);
+  }
+}
+
+function showVictoryCertificate() {
+  playSuccessChime();
+  setTimeout(() => {
+    playTone(523.25, 'triangle', 0.2, 0.3);
+    setTimeout(() => playTone(659.25, 'triangle', 0.2, 0.3), 100);
+    setTimeout(() => playTone(783.99, 'triangle', 0.4, 0.3), 200);
+  }, 300);
+  document.getElementById('certModal').style.display = 'flex';
+}
+
+function restartGame() {
+  document.getElementById('certModal').style.display = 'none';
+  totalSteps = 0;
+  tvSeconds = 0;
+  relayPowered = false;
+  goToStage(1);
+}
+
+// Initial draw
+window.addEventListener('load', () => {
+  drawGraph();
+  drawAllOLEDs();
+});
+</script>
+
+</body>
+</html>
